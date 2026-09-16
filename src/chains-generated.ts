@@ -44,6 +44,7 @@ export const CHAIN_IDENTIFIERS = [
   "ink",
   "robinhood",
   "stablechain",
+  "arc",
 ] as const satisfies readonly ChainIdentifier[]
 
 type _AssertEveryChainIdentifierListed =

@@ -1005,7 +1005,7 @@ export interface paths {
         };
         /**
          * List the authenticated account's agent relationships
-         * @description Includes proposals still awaiting either party. Pending relationships appear here only; they are never shown on a public profile. Truncated to the 100 most recent confirmed relationships and the 50 most recent live proposals, bounded separately so unanswered proposals cannot displace confirmed relationships. No total is returned. Confirming or revoking names the counterparty address, so neither needs a relationship to appear here.
+         * @description Includes proposals still awaiting either party. Pending relationships appear here only; they are never shown on a public profile. Truncated to the 100 most recent confirmed relationships and the 50 most recent live proposals, bounded separately so unanswered proposals cannot displace confirmed relationships. No total is returned. Confirming or revoking names the counterparty's account id, which this listing is the source of.
          */
         get: operations["list_own_agent_relationships"];
         put?: never;
@@ -1016,7 +1016,7 @@ export interface paths {
         post: operations["propose_agent_relationship"];
         /**
          * Withdraw a proposal or revoke a confirmed agent relationship
-         * @description Either party may remove the relationship at any point.
+         * @description Either party may remove the relationship at any point. Addressed exactly as confirm is: `counterparty_account_id` or `counterparty_address`, one of the two, plus your own side.
          */
         delete: operations["revoke_agent_relationship"];
         options?: never;
@@ -1033,7 +1033,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Confirm an agent relationship proposed to the authenticated account */
+        /**
+         * Confirm an agent relationship proposed to the authenticated account
+         * @description Name the other party by `counterparty_account_id`, from `agent_account_id` or `owner_account_id` on a listed relationship, or by `counterparty_address`. Prefer the account: the relationship is the pair of accounts, so it stays addressable after either party unlinks the wallet it was proposed with, whereas an address stops resolving once unlinked.
+         */
         post: operations["confirm_agent_relationship"];
         delete?: never;
         options?: never;
@@ -2269,7 +2272,7 @@ export interface paths {
         };
         /**
          * Get profiles followed
-         * @description Returns account targets followed by a username profile. Wallet targets return an empty page because wallet following graphs are not exposed.
+         * @description Returns the profiles followed by an address or username profile, including followed wallets.
          */
         get: operations["get_account_following"];
         put?: never;
@@ -2671,7 +2674,7 @@ export interface components {
          * @example ethereum
          * @enum {string}
          */
-        ChainIdentifier: "blast" | "base" | "ethereum" | "zora" | "arbitrum" | "sei" | "avalanche" | "polygon" | "optimism" | "ape_chain" | "flow" | "b3" | "soneium" | "ronin" | "bera_chain" | "solana" | "shape" | "unichain" | "gunzilla" | "abstract" | "animechain" | "hyperevm" | "somnia" | "monad" | "hyperliquid" | "megaeth" | "ink" | "robinhood" | "stablechain";
+        ChainIdentifier: "blast" | "base" | "ethereum" | "zora" | "arbitrum" | "sei" | "avalanche" | "polygon" | "optimism" | "ape_chain" | "flow" | "b3" | "soneium" | "ronin" | "bera_chain" | "solana" | "shape" | "unichain" | "gunzilla" | "abstract" | "animechain" | "hyperevm" | "somnia" | "monad" | "hyperliquid" | "megaeth" | "ink" | "robinhood" | "stablechain" | "arc";
         /** @description Ready-to-sign SelfMint drop item transaction data */
         SelfMintDropItemResponse: {
             /** @description Transaction target contract address */
@@ -4673,12 +4676,9 @@ export interface components {
             created: boolean;
         };
         AgentRelationshipResponse: {
-            initiator_address?: string;
-            counterparty_address?: string;
             agent_account_id: string;
             owner_account_id: string;
             status: string;
-            initiated_by: string;
             awaiting_confirmation_from?: string;
             /**
              * Format: double
@@ -4690,6 +4690,17 @@ export interface components {
              * @description Unix timestamp in seconds, including fractional seconds
              */
             confirmed_at?: number;
+        };
+        ConfirmAgentRelationshipRequestBody: {
+            /** @description The other party's account id. Preferred over an address. */
+            counterparty_account_id?: string;
+            /** @description A wallet the other party has linked publicly, resolved to their account. Stops resolving once unlinked. */
+            counterparty_address?: string;
+            /**
+             * @description Which side of the relationship the caller is on
+             * @enum {string}
+             */
+            caller_role: "AGENT" | "OWNER";
         };
         /** @description Request body for updating profile settings */
         UpdateProfileSettingsRequest: {
@@ -9066,7 +9077,8 @@ export interface operations {
     revoke_agent_relationship: {
         parameters: {
             query: {
-                counterparty_address: string;
+                counterparty_account_id?: string;
+                counterparty_address?: string;
                 caller_role: string;
             };
             header?: never;
@@ -9095,7 +9107,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProposeAgentRelationshipRequestBody"];
+                "application/json": components["schemas"]["ConfirmAgentRelationshipRequestBody"];
             };
         };
         responses: {

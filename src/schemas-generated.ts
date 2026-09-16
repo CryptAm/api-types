@@ -530,6 +530,15 @@ export type CollectionStatsResponse = Schemas["CollectionStatsResponse"]
 /**
  * Wire shape, snake_case as the API sends and accepts it. `@opensea/sdk`
  * camelizes responses and snakeizes request bodies, so annotate an
+ * SDK-facing value with `Camelize<ConfirmAgentRelationshipRequestBody>` (exported by
+ * `@opensea/sdk`) or the matching `@opensea/sdk` type rather than with
+ * `ConfirmAgentRelationshipRequestBody`.
+ */
+export type ConfirmAgentRelationshipRequestBody = Schemas["ConfirmAgentRelationshipRequestBody"]
+
+/**
+ * Wire shape, snake_case as the API sends and accepts it. `@opensea/sdk`
+ * camelizes responses and snakeizes request bodies, so annotate an
  * SDK-facing value with `Camelize<Consideration>` (exported by
  * `@opensea/sdk`) or the matching `@opensea/sdk` type rather than with
  * `Consideration`.

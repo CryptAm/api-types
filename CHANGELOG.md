@@ -1,5 +1,15 @@
 # @opensea/api-types
 
+## 0.12.0
+
+### Minor Changes
+
+- cd6e615: Sync OpenAPI spec: add `arc` chain identifier; agent relationships gain `ConfirmAgentRelationshipRequestBody` and optional `counterparty_account_id` addressing, `AgentRelationshipResponse` drops `initiator_address`/`counterparty_address`/`initiated_by`. `revokeAgentRelationship` serializes whichever counterparty identifier is provided (`counterpartyAccountId` or `counterpartyAddress`).
+
+### Patch Changes
+
+- fbbbea4: Sync OpenAPI spec: `get_account_following` description now states that followed wallets are included for address or username profiles (previously documented wallet targets as an empty page).
+
 ## 0.11.1
 
 ### Patch Changes
