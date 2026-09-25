@@ -113,7 +113,7 @@
             "schema": {
               "type": "string"
             },
-            "example": 123
+            "example": "123"
           }
         ],
         "requestBody": {
@@ -207,7 +207,7 @@
             "schema": {
               "type": "string"
             },
-            "example": 123
+            "example": "123"
           }
         ],
         "requestBody": {
@@ -2797,7 +2797,7 @@
             "schema": {
               "type": "string"
             },
-            "example": 1
+            "example": "1"
           },
           {
             "name": "ignoreCachedItemUrls",
@@ -4574,7 +4574,7 @@
             "schema": {
               "type": "string"
             },
-            "example": 1000000000000000000
+            "example": "1000000000000000000"
           },
           {
             "name": "address",
@@ -5195,7 +5195,7 @@
             "schema": {
               "type": "string"
             },
-            "example": 1
+            "example": "1"
           }
         ],
         "responses": {
@@ -5704,7 +5704,7 @@
             "schema": {
               "type": "string"
             },
-            "example": 1
+            "example": "1"
           },
           {
             "name": "after",
@@ -7399,7 +7399,7 @@
             "schema": {
               "type": "string"
             },
-            "example": 1
+            "example": "1"
           }
         ],
         "responses": {
@@ -7460,7 +7460,7 @@
             "schema": {
               "type": "string"
             },
-            "example": 1
+            "example": "1"
           },
           {
             "name": "limit",
@@ -7542,7 +7542,7 @@
             "schema": {
               "type": "string"
             },
-            "example": 1
+            "example": "1"
           }
         ],
         "responses": {
@@ -7603,7 +7603,7 @@
             "schema": {
               "type": "string"
             },
-            "example": 1
+            "example": "1"
           }
         ],
         "responses": {
@@ -9533,12 +9533,12 @@
           "token_id": {
             "type": "string",
             "description": "Token ID for NFTs",
-            "example": 1234
+            "example": "1234"
           },
           "amount": {
             "type": "string",
             "description": "Amount in base units (wei/lamports)",
-            "example": 1000000000000000000
+            "example": "1000000000000000000"
           }
         },
         "required": ["amount", "chain", "contract"]
@@ -9635,7 +9635,7 @@
           "token_id": {
             "type": "string",
             "description": "Token ID for NFTs",
-            "example": 1234
+            "example": "1234"
           }
         },
         "required": ["chain", "contract"]
@@ -9651,7 +9651,7 @@
           "quantity": {
             "type": "string",
             "description": "Quantity received in base units",
-            "example": 1
+            "example": "1"
           },
           "price": {
             "$ref": "#/components/schemas/PriceResponse",
@@ -9667,7 +9667,7 @@
           "amount": {
             "type": "string",
             "description": "Amount in the token's native units",
-            "example": 5.5
+            "example": "5.5"
           },
           "currency": {
             "type": "string",
@@ -9677,7 +9677,7 @@
           "usd": {
             "type": "string",
             "description": "USD equivalent",
-            "example": 19250
+            "example": "19250.0"
           }
         },
         "required": ["amount", "usd"]
@@ -9904,7 +9904,7 @@
           "usd_price": {
             "type": "string",
             "description": "Current price in USD",
-            "example": 1
+            "example": "1.0"
           },
           "decimals": {
             "type": "integer",
@@ -9970,7 +9970,7 @@
           "usd_price": {
             "type": "string",
             "description": "Current price in USD",
-            "example": 1
+            "example": "1.0"
           },
           "decimals": {
             "type": "integer",
@@ -10148,7 +10148,7 @@
           "amount": {
             "type": "string",
             "description": "Amount in the smallest unit of the token (e.g. wei for ETH). Use \"0\" for to_assets to receive the market rate.",
-            "example": 1000000000000000000
+            "example": "1000000000000000000"
           }
         },
         "required": ["amount", "chain", "contract"]
@@ -10233,6 +10233,33 @@
         },
         "required": ["accounts", "program_id"]
       },
+      "SvmTransactionConfigResponse": {
+        "type": "object",
+        "description": "Compute budget a v1 Solana message carries inline instead of as instructions",
+        "properties": {
+          "priority_fee_lamports": {
+            "type": "string",
+            "description": "Total priority fee in lamports, as a decimal string",
+            "example": "5000"
+          },
+          "compute_unit_limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Compute unit limit",
+            "example": 200000
+          },
+          "loaded_accounts_data_size_limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Loaded accounts data size limit in bytes"
+          },
+          "heap_size_bytes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Requested heap frame size in bytes"
+          }
+        }
+      },
       "SvmTransactionDetailsResponse": {
         "type": "object",
         "description": "Everything needed to compile and sign a Solana v0 transaction. The client supplies a recent blockhash.",
@@ -10254,6 +10281,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "transaction_config": {
+            "$ref": "#/components/schemas/SvmTransactionConfigResponse",
+            "description": "Present only when the transaction may be compiled as a v1 message. A v1 compiler drops the ComputeBudget instructions from `instructions` and places these values in the message header; legacy/v0 compilers ignore this field"
           }
         },
         "required": ["address_lookup_tables", "from", "instructions"]
@@ -10280,7 +10311,7 @@
           "usd": {
             "type": "string",
             "description": "Cost amount in USD",
-            "example": 0.5
+            "example": "0.5"
           }
         },
         "required": ["type", "usd"]
@@ -10310,12 +10341,12 @@
           "usd": {
             "type": "string",
             "description": "Price impact in USD (negative means user loses value)",
-            "example": -1.5
+            "example": "-1.5"
           },
           "percent": {
             "type": "string",
             "description": "Price impact as a percentage (negative means user loses value)",
-            "example": -0.08
+            "example": "-0.08"
           }
         },
         "required": ["percent", "usd"]
@@ -10455,13 +10486,13 @@
           "tool_id": {
             "type": "string",
             "description": "Numeric registered tool ID",
-            "example": 42,
+            "example": "42",
             "minLength": 1
           },
           "registry_chain": {
             "type": "string",
             "description": "Numeric registry chain ID",
-            "example": 8453,
+            "example": "8453",
             "minLength": 1
           },
           "registry_addr": {
@@ -10707,7 +10738,7 @@
           "tokenId": {
             "type": "string",
             "description": "Token ID of the NFT",
-            "example": 1,
+            "example": "1",
             "maxLength": 200,
             "minLength": 0
           },
@@ -12346,7 +12377,7 @@
           "token_id": {
             "type": "string",
             "description": "Token ID of the NFT",
-            "example": 1234
+            "example": "1234"
           }
         },
         "required": ["chain", "contract", "token_id"]
@@ -12398,7 +12429,7 @@
           "amount": {
             "type": "string",
             "description": "Price amount in the currency's unit (e.g. '5.0' for 5 ETH)",
-            "example": 5
+            "example": "5.0"
           },
           "currency": {
             "type": "string",
@@ -12453,7 +12484,7 @@
           "token_id": {
             "type": "string",
             "description": "The token ID of the NFT",
-            "example": 1
+            "example": "1"
           }
         },
         "required": ["chain", "contract_address", "token_id"]
@@ -12790,7 +12821,7 @@
           "max_price_per_item": {
             "type": "string",
             "description": "Maximum price per item in the payment token's units",
-            "example": 10
+            "example": "10.0"
           },
           "buyer": {
             "type": "string",
@@ -12968,7 +12999,7 @@
           "token_id": {
             "type": "string",
             "description": "Token ID of the NFT",
-            "example": 1234
+            "example": "1234"
           },
           "quantity": {
             "type": "integer",
@@ -13497,10 +13528,12 @@
             "type": "string"
           },
           "image_url": {
-            "type": "string"
+            "type": "string",
+            "description": "Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own."
           },
           "banner_image_url": {
-            "type": "string"
+            "type": "string",
+            "description": "Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one."
           },
           "owner": {
             "type": "string"
@@ -13751,12 +13784,12 @@
           "token_id": {
             "type": "string",
             "description": "The token ID of the asset",
-            "example": 1234
+            "example": "1234"
           },
           "quantity": {
             "type": "string",
             "description": "The quantity to transfer in raw units (1 for ERC721, raw amount for ERC1155/fungible)",
-            "example": 1
+            "example": "1"
           }
         },
         "required": ["chain", "contract", "quantity", "token_id"]
@@ -15404,7 +15437,7 @@
           "usd_price": {
             "type": "string",
             "description": "Current price in USD",
-            "example": 1
+            "example": "1.0"
           },
           "decimals": {
             "type": "integer",
@@ -15499,7 +15532,7 @@
           "usd_price": {
             "type": "string",
             "description": "Current price in USD",
-            "example": 2345.67
+            "example": "2345.67"
           }
         },
         "required": [
@@ -15785,7 +15818,7 @@
           "identifier": {
             "type": "string",
             "description": "Token ID of the NFT",
-            "example": 1234
+            "example": "1234"
           },
           "collection": {
             "type": "string",
@@ -15884,7 +15917,7 @@
           "usd_price": {
             "type": "string",
             "description": "Current price in USD",
-            "example": 1
+            "example": "1.0"
           },
           "decimals": {
             "type": "integer",
@@ -16564,10 +16597,12 @@
             "type": "string"
           },
           "image_url": {
-            "type": "string"
+            "type": "string",
+            "description": "Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own."
           },
           "banner_image_url": {
-            "type": "string"
+            "type": "string",
+            "description": "Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one."
           },
           "owner": {
             "type": "string"
@@ -17100,7 +17135,7 @@
           "usd_price": {
             "type": "string",
             "description": "Price in USD",
-            "example": 1
+            "example": "1.0"
           }
         },
         "required": ["time", "usd_price"]
@@ -17468,13 +17503,13 @@
           "volume_usd": {
             "type": "string",
             "description": "Total buy and sell volume in USD",
-            "example": 710410.75,
+            "example": "710410.75",
             "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
           },
           "average_trade_usd": {
             "type": "string",
             "description": "Average USD volume per trade",
-            "example": 232.92,
+            "example": "232.92",
             "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
           },
           "unique_buyer_count": {
@@ -17861,7 +17896,7 @@
           "usd_price": {
             "type": "string",
             "description": "Current price in USD",
-            "example": 1
+            "example": "1.0"
           },
           "decimals": {
             "type": "integer",
@@ -17876,12 +17911,12 @@
           "quantity": {
             "type": "string",
             "description": "Token balance in display units (divided by 10^decimals), not raw/wei",
-            "example": 1.5
+            "example": "1.5"
           },
           "usd_value": {
             "type": "string",
             "description": "Total USD value of the balance (quantity * usd_price)",
-            "example": 3518.51835185
+            "example": "3518.51835185"
           },
           "status": {
             "type": "string",
@@ -17892,12 +17927,12 @@
           "base_token_liquidity_usd": {
             "type": "string",
             "description": "USD value of base token reserves in the top liquidity pool paired with a curated quote token",
-            "example": 125000.5
+            "example": "125000.5"
           },
           "quote_token_liquidity_usd": {
             "type": "string",
             "description": "USD value of quote token reserves in the top liquidity pool paired with a curated quote token",
-            "example": 125000.5
+            "example": "125000.5"
           }
         },
         "required": [
@@ -17990,17 +18025,17 @@
           "total_value_usd": {
             "type": "string",
             "description": "Total portfolio value in USD",
-            "example": 125430.5
+            "example": "125430.5"
           },
           "nft_value_usd": {
             "type": "string",
             "description": "NFT portfolio value in USD",
-            "example": 98200
+            "example": "98200.0"
           },
           "token_value_usd": {
             "type": "string",
             "description": "Token portfolio value in USD",
-            "example": 27230.5
+            "example": "27230.5"
           },
           "pnl_absolute": {
             "type": "string",
@@ -18038,17 +18073,17 @@
           "value_usd": {
             "type": "string",
             "description": "Total portfolio value in USD",
-            "example": 124180
+            "example": "124180.0"
           },
           "token_value_usd": {
             "type": "string",
             "description": "Token value in USD",
-            "example": 26000
+            "example": "26000.0"
           },
           "nft_value_usd": {
             "type": "string",
             "description": "NFT value in USD",
-            "example": 98180
+            "example": "98180.0"
           }
         },
         "required": [
@@ -18089,7 +18124,7 @@
           "unrealized_pnl_usd": {
             "type": "string",
             "description": "Unrealized P&L in USD from open positions",
-            "example": -320.1
+            "example": "-320.1"
           },
           "total_pnl_usd": {
             "type": "string",
@@ -18099,12 +18134,12 @@
           "net_invested_usd": {
             "type": "string",
             "description": "Net amount invested in USD",
-            "example": 12500
+            "example": "12500.0"
           },
           "current_value_usd": {
             "type": "string",
             "description": "Current USD value of the wallet's open positions (net_invested + unrealized P&L). Provides a visible anchor for the unrealized figure.",
-            "example": 12179.9
+            "example": "12179.9"
           },
           "return_percentage": {
             "type": "string",
@@ -18133,17 +18168,17 @@
           "quantity_raw": {
             "type": "string",
             "description": "Raw token quantity transferred, in token base units, as a string to preserve precision.",
-            "example": 1500000000
+            "example": "1500000000"
           },
           "price_usd": {
             "type": "string",
             "description": "Token price in USD at the time of the transfer, or null if unknown.",
-            "example": 0.0425
+            "example": "0.0425"
           },
           "value_usd": {
             "type": "string",
             "description": "USD value of the transfer, or null if unknown.",
-            "example": 63.75
+            "example": "63.75"
           },
           "tx_signature": {
             "type": "string",
@@ -18209,17 +18244,17 @@
           "total_proceeds_usd": {
             "type": "string",
             "description": "Total USD proceeds from the sells that closed this position.",
-            "example": 5200
+            "example": "5200.0"
           },
           "total_cost_basis_usd": {
             "type": "string",
             "description": "Total USD cost basis of the tokens sold, via FIFO lot matching.",
-            "example": 3359.75
+            "example": "3359.75"
           },
           "avg_cost_per_token_usd": {
             "type": "string",
             "description": "Average cost per token in USD (FIFO).",
-            "example": 0.0425
+            "example": "0.0425"
           },
           "closed_at": {
             "type": "number",
@@ -18503,10 +18538,12 @@
             "type": "string"
           },
           "image_url": {
-            "type": "string"
+            "type": "string",
+            "description": "Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own."
           },
           "banner_image_url": {
-            "type": "string"
+            "type": "string",
+            "description": "Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one."
           },
           "owner": {
             "type": "string"

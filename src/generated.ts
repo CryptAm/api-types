@@ -2848,7 +2848,7 @@ export interface components {
             currency?: string;
             /**
              * @description USD equivalent
-             * @example 19250
+             * @example 19250.0
              */
             usd: string;
         };
@@ -2957,7 +2957,7 @@ export interface components {
             image_url?: string;
             /**
              * @description Current price in USD
-             * @example 1
+             * @example 1.0
              */
             usd_price: string;
             /**
@@ -2998,7 +2998,7 @@ export interface components {
             image_url?: string;
             /**
              * @description Current price in USD
-             * @example 1
+             * @example 1.0
              */
             usd_price: string;
             /**
@@ -3185,6 +3185,30 @@ export interface components {
              */
             data?: string;
         };
+        /** @description Compute budget a v1 Solana message carries inline instead of as instructions */
+        SvmTransactionConfigResponse: {
+            /**
+             * @description Total priority fee in lamports, as a decimal string
+             * @example 5000
+             */
+            priority_fee_lamports?: string;
+            /**
+             * Format: int32
+             * @description Compute unit limit
+             * @example 200000
+             */
+            compute_unit_limit?: number;
+            /**
+             * Format: int32
+             * @description Loaded accounts data size limit in bytes
+             */
+            loaded_accounts_data_size_limit?: number;
+            /**
+             * Format: int32
+             * @description Requested heap frame size in bytes
+             */
+            heap_size_bytes?: number;
+        };
         /** @description Everything needed to compile and sign a Solana v0 transaction. The client supplies a recent blockhash. */
         SvmTransactionDetailsResponse: {
             /** @description Base58-encoded address the transaction is built for */
@@ -3193,6 +3217,8 @@ export interface components {
             instructions: components["schemas"]["SvmInstructionResponse"][];
             /** @description Base58-encoded address lookup tables the compiled message must reference to stay under the transaction size limit */
             address_lookup_tables: string[];
+            /** @description Present only when the transaction may be compiled as a v1 message. A v1 compiler drops the ComputeBudget instructions from `instructions` and places these values in the message header; legacy/v0 compilers ignore this field */
+            transaction_config?: components["schemas"]["SvmTransactionConfigResponse"];
         };
         /** @description A cost component of the swap */
         SwapCostResponse: {
@@ -4002,7 +4028,7 @@ export interface components {
         ListingPriceInput: {
             /**
              * @description Price amount in the currency's unit (e.g. '5.0' for 5 ETH)
-             * @example 5
+             * @example 5.0
              */
             amount: string;
             /**
@@ -4163,7 +4189,7 @@ export interface components {
             max_items: number;
             /**
              * @description Maximum price per item in the payment token's units
-             * @example 10
+             * @example 10.0
              */
             max_price_per_item: string;
             /**
@@ -4519,7 +4545,9 @@ export interface components {
             collection: string;
             name: string;
             description?: string;
+            /** @description Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own. */
             image_url?: string;
+            /** @description Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. */
             banner_image_url?: string;
             owner?: string;
             safelist_status: string;
@@ -5270,7 +5298,7 @@ export interface components {
             image_url?: string;
             /**
              * @description Current price in USD
-             * @example 1
+             * @example 1.0
              */
             usd_price: string;
             /**
@@ -5562,7 +5590,7 @@ export interface components {
             image_url?: string;
             /**
              * @description Current price in USD
-             * @example 1
+             * @example 1.0
              */
             usd_price: string;
             /**
@@ -5833,7 +5861,9 @@ export interface components {
             collection: string;
             name: string;
             description?: string;
+            /** @description Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own. */
             image_url?: string;
+            /** @description Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. */
             banner_image_url?: string;
             owner?: string;
             safelist_status: string;
@@ -6086,7 +6116,7 @@ export interface components {
             time: number;
             /**
              * @description Price in USD
-             * @example 1
+             * @example 1.0
              */
             usd_price: string;
         };
@@ -6454,7 +6484,7 @@ export interface components {
             image_url?: string;
             /**
              * @description Current price in USD
-             * @example 1
+             * @example 1.0
              */
             usd_price: string;
             /**
@@ -6539,7 +6569,7 @@ export interface components {
             total_value_usd: string;
             /**
              * @description NFT portfolio value in USD
-             * @example 98200
+             * @example 98200.0
              */
             nft_value_usd: string;
             /**
@@ -6573,17 +6603,17 @@ export interface components {
             timestamp: number;
             /**
              * @description Total portfolio value in USD
-             * @example 124180
+             * @example 124180.0
              */
             value_usd: string;
             /**
              * @description Token value in USD
-             * @example 26000
+             * @example 26000.0
              */
             token_value_usd: string;
             /**
              * @description NFT value in USD
-             * @example 98180
+             * @example 98180.0
              */
             nft_value_usd: string;
         };
@@ -6616,7 +6646,7 @@ export interface components {
             total_pnl_usd: string;
             /**
              * @description Net amount invested in USD
-             * @example 12500
+             * @example 12500.0
              */
             net_invested_usd: string;
             /**
@@ -6698,7 +6728,7 @@ export interface components {
             return_percentage: string;
             /**
              * @description Total USD proceeds from the sells that closed this position.
-             * @example 5200
+             * @example 5200.0
              */
             total_proceeds_usd: string;
             /**
@@ -6858,7 +6888,9 @@ export interface components {
             collection: string;
             name: string;
             description?: string;
+            /** @description Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own. */
             image_url?: string;
+            /** @description Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. */
             banner_image_url?: string;
             owner?: string;
             safelist_status: string;

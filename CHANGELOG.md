@@ -1,5 +1,11 @@
 # @opensea/api-types
 
+## 0.12.1
+
+### Patch Changes
+
+- 711dbc7: Sync OpenAPI spec: add `SvmTransactionConfigResponse` and the optional `transaction_config` field on `SvmTransactionDetailsResponse`; add field descriptions for collection `image_url` / `banner_image_url`; string-typed schema and parameter `example`s are now published as JSON strings (e.g. `priority_fee_lamports`).
+
 ## 0.12.0
 
 ### Minor Changes

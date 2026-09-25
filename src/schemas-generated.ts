@@ -2141,6 +2141,15 @@ export type SvmOrderIdentity = Schemas["SvmOrderIdentity"]
 /**
  * Wire shape, snake_case as the API sends and accepts it. `@opensea/sdk`
  * camelizes responses and snakeizes request bodies, so annotate an
+ * SDK-facing value with `Camelize<SvmTransactionConfigResponse>` (exported by
+ * `@opensea/sdk`) or the matching `@opensea/sdk` type rather than with
+ * `SvmTransactionConfigResponse`.
+ */
+export type SvmTransactionConfigResponse = Schemas["SvmTransactionConfigResponse"]
+
+/**
+ * Wire shape, snake_case as the API sends and accepts it. `@opensea/sdk`
+ * camelizes responses and snakeizes request bodies, so annotate an
  * SDK-facing value with `Camelize<SvmTransactionDetailsResponse>` (exported by
  * `@opensea/sdk`) or the matching `@opensea/sdk` type rather than with
  * `SvmTransactionDetailsResponse`.
