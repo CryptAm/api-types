@@ -1,5 +1,11 @@
 # @opensea/api-types
 
+## 0.14.0
+
+### Minor Changes
+
+- 3f93447: Sync OpenAPI spec. 156 more response properties are now typed nullable, because the spec now infers nullability from the API's Kotlin types: a response property is nullable when its type is nullable and the API writes a JSON null for it rather than omitting the key. The API already returned null for these fields; the types now say so. Code that reads them may need a null check, which is why this is a minor release. Request types are unchanged.
+
 ## 0.13.0
 
 ### Minor Changes

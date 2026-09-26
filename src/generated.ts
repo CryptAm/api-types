@@ -3415,7 +3415,7 @@ export interface components {
              * @description Recommended delay in milliseconds before re-requesting this quote; absent when there is no actionable route
              * @example 2000
              */
-            refresh_after_ms?: number;
+            refresh_after_ms?: number | null;
             /**
              * Format: int32
              * @description Marketplace fee in basis points
@@ -3520,20 +3520,20 @@ export interface components {
         };
         /** @description Metadata for a shelf item */
         ProfileShelfItemMetadataResponse: {
-            description?: string;
+            description?: string | null;
         };
         /** @description Profile shelf */
         ProfileShelfResponse: {
             id: string;
-            account_address?: string;
+            account_address?: string | null;
             title: string;
-            description?: string;
+            description?: string | null;
             /** Format: int32 */
             display_order: number;
             items: components["schemas"]["ProfileShelfItemIdentifierResponse"][];
-            icon?: string;
-            view?: string;
-            single_item_shelf_side?: string;
+            icon?: string | null;
+            view?: string | null;
+            single_item_shelf_side?: string | null;
             shelf_item_metadata: {
                 [key: string]: components["schemas"]["ProfileShelfItemMetadataResponse"];
             };
@@ -3565,7 +3565,7 @@ export interface components {
             contract_address: string;
             token_id: string;
             chain: string;
-            collection_slug?: string;
+            collection_slug?: string | null;
             image_url: string;
             is_verified: boolean;
         };
@@ -3671,11 +3671,11 @@ export interface components {
             address: string;
         };
         Criteria: {
-            collection?: components["schemas"]["CollectionInner"];
-            contract?: components["schemas"]["ContractInner"];
-            traits?: components["schemas"]["TraitData"][];
-            numeric_traits?: components["schemas"]["NumericTraitData"][];
-            encoded_token_ids?: string;
+            collection?: components["schemas"]["CollectionInner"] | null;
+            contract?: components["schemas"]["ContractInner"] | null;
+            traits?: components["schemas"]["TraitData"][] | null;
+            numeric_traits?: components["schemas"]["NumericTraitData"][] | null;
+            encoded_token_ids?: string | null;
         };
         Item: {
             /** Format: int32 */
@@ -3688,9 +3688,9 @@ export interface components {
         NumericTraitData: {
             type: string;
             /** Format: float */
-            min?: number;
+            min?: number | null;
             /** Format: float */
-            max?: number;
+            max?: number | null;
         };
         Offer: components["schemas"]["ListingOrOffer"] & {
             /** @description Seaport order hash, a 0x-prefixed 32-byte value. Absent on an order that settles through a Solana marketplace program, which has no Seaport identity and carries `svm_order` instead. Every EVM order has one. */
@@ -3698,16 +3698,16 @@ export interface components {
             chain: string;
             protocol_data?: components["schemas"]["ProtocolData"];
             protocol_address?: string;
-            asset?: components["schemas"]["OrderAsset"];
+            asset?: components["schemas"]["OrderAsset"] | null;
             /** Format: int64 */
             remaining_quantity: number;
             /** Format: int64 */
-            order_created_at?: number;
+            order_created_at?: number | null;
             /** @description Marketplace protocol a Solana order settles through, which is what tells you which identity shape the order uses. Absent on a Seaport order, whose payload is unchanged. Only orders we can build fulfillment for carry a value here. */
             protocol?: string;
             /** @description Identity of a Solana order, present in place of `order_hash`. A client that assumes `order_hash` is always set should read this field first and fall back to `order_hash`. */
             svm_order?: components["schemas"]["SvmOrderIdentity"];
-            criteria?: components["schemas"]["Criteria"];
+            criteria?: components["schemas"]["Criteria"] | null;
             price: components["schemas"]["Price"];
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE" | "FULFILLED" | "EXPIRED" | "CANCELLED";
@@ -3718,18 +3718,18 @@ export interface components {
             chain: string;
             protocol_data?: components["schemas"]["ProtocolData"];
             protocol_address?: string;
-            asset?: components["schemas"]["OrderAsset"];
+            asset?: components["schemas"]["OrderAsset"] | null;
             /** Format: int64 */
             remaining_quantity: number;
             /** Format: int64 */
-            order_created_at?: number;
+            order_created_at?: number | null;
             /** @description Marketplace protocol a Solana order settles through, which is what tells you which identity shape the order uses. Absent on a Seaport order, whose payload is unchanged. Only orders we can build fulfillment for carry a value here. */
             protocol?: string;
             /** @description Identity of a Solana order, present in place of `order_hash`. A client that assumes `order_hash` is always set should read this field first and fall back to `order_hash`. */
             svm_order?: components["schemas"]["SvmOrderIdentity"];
         };
         OrderAsset: {
-            identifier?: string;
+            identifier?: string | null;
             contract: string;
         };
         Parameters: {
@@ -3756,7 +3756,7 @@ export interface components {
         };
         ProtocolData: {
             parameters: components["schemas"]["Parameters"];
-            signature?: string;
+            signature?: string | null;
         };
         /** @description Identity of an order that settles through a Solana marketplace program. Such an order has no Seaport order hash, so `order_hash` is absent from its payload and it is addressed instead by `id`, the transaction signature that created it joined to the onchain state account holding it. Pass that `id` wherever an endpoint takes an order hash. */
         SvmOrderIdentity: {
@@ -3784,11 +3784,11 @@ export interface components {
             chain: string;
             protocol_data?: components["schemas"]["ProtocolData"];
             protocol_address?: string;
-            asset?: components["schemas"]["OrderAsset"];
+            asset?: components["schemas"]["OrderAsset"] | null;
             /** Format: int64 */
             remaining_quantity: number;
             /** Format: int64 */
-            order_created_at?: number;
+            order_created_at?: number | null;
             /** @description Marketplace protocol a Solana order settles through, which is what tells you which identity shape the order uses. Absent on a Seaport order, whose payload is unchanged. Only orders we can build fulfillment for carry a value here. */
             protocol?: string;
             /** @description Identity of a Solana order, present in place of `order_hash`. A client that assumes `order_hash` is always set should read this field first and fall back to `order_hash`. */
@@ -3831,23 +3831,23 @@ export interface components {
         /** @description Criteria for collection or trait offers. When traits are specified, the offer targets NFTs matching those traits. For supported collections, the identifierOrCriteria (merkle root) will be '0' and trait matching is validated server-side at fulfillment time. */
         CriteriaRequest: {
             collection: components["schemas"]["CollectionCriteria"];
-            contract?: components["schemas"]["ContractCriteria"];
+            contract?: components["schemas"]["ContractCriteria"] | null;
             /**
              * @deprecated
              * @description Deprecated: Use 'traits' array instead which supports both single and multiple traits.
              */
-            trait?: components["schemas"]["TraitCriteria"];
+            trait?: components["schemas"]["TraitCriteria"] | null;
             /** @description Trait criteria for the offer. Each trait specifies a type and value that target NFTs must match. These traits are validated server-side at fulfillment time. */
-            traits?: components["schemas"]["TraitCriteria"][];
+            traits?: components["schemas"]["TraitCriteria"][] | null;
             /** @description Numeric trait criteria for the offer. Each entry specifies a trait type with optional min/max range bounds. Can be combined with categorical traits. */
-            numericTraits?: components["schemas"]["NumericTraitCriteria"][];
+            numericTraits?: components["schemas"]["NumericTraitCriteria"][] | null;
         };
         NumericTraitCriteria: {
             type: string;
             /** Format: double */
-            min?: number;
+            min?: number | null;
             /** Format: double */
-            max?: number;
+            max?: number | null;
         };
         OfferWithCriteriaRequest: {
             protocol_data: components["schemas"]["SeaportProtocolDataModel"];
@@ -4039,7 +4039,7 @@ export interface components {
             chain: number;
             to: string;
             value: string;
-            value_hex?: string;
+            value_hex?: string | null;
             input_data: components["schemas"]["FulfillAdvancedOrder"] | components["schemas"]["FulfillAvailableAdvancedOrders"] | components["schemas"]["FulfillAvailableOrders"] | components["schemas"]["FulfillBasicOrder"] | components["schemas"]["FulfillOrder"] | components["schemas"]["MatchAdvancedOrders"] | components["schemas"]["MatchOrders"];
             /** @description 4-byte hex attribution suffix (e.g. 0xcdb44011) to append to the ABI-encoded calldata before submitting the transaction onchain. Appending this suffix attributes the fill to OpenSea; omitting it does not affect execution. */
             calldata_suffix?: string | null;
@@ -4199,7 +4199,7 @@ export interface components {
             agent_id: string;
             binding_contract: string;
             agent: components["schemas"]["AgentNftResponse"];
-            registered_by?: string;
+            registered_by?: string | null;
         };
         AgentNftResponse: {
             chain: string;
@@ -4211,23 +4211,23 @@ export interface components {
             collection: string;
             contract: string;
             token_standard: string;
-            name?: string;
-            description?: string;
-            image_url?: string;
-            display_image_url?: string;
-            display_animation_url?: string;
-            metadata_url?: string;
+            name?: string | null;
+            description?: string | null;
+            image_url?: string | null;
+            display_image_url?: string | null;
+            display_animation_url?: string | null;
+            metadata_url?: string | null;
             opensea_url: string;
             updated_at: string;
             is_disabled: boolean;
             is_nsfw: boolean;
-            original_image_url?: string;
-            original_animation_url?: string;
+            original_image_url?: string | null;
+            original_animation_url?: string | null;
             traits: components["schemas"]["Trait"][];
             /** Format: double */
-            estimated_value_usd?: number;
+            estimated_value_usd?: number | null;
             /** Format: int32 */
-            decimals?: number;
+            decimals?: number | null;
         };
         NftBatchResponse: {
             nfts: components["schemas"]["NftDetailed"][];
@@ -4237,30 +4237,30 @@ export interface components {
             collection: string;
             contract: string;
             token_standard: string;
-            name?: string;
-            description?: string;
-            image_url?: string;
-            display_image_url?: string;
-            display_animation_url?: string;
-            metadata_url?: string;
+            name?: string | null;
+            description?: string | null;
+            image_url?: string | null;
+            display_image_url?: string | null;
+            display_animation_url?: string | null;
+            metadata_url?: string | null;
             opensea_url: string;
             updated_at: string;
             is_disabled: boolean;
             is_nsfw: boolean;
-            original_image_url?: string;
-            original_animation_url?: string;
+            original_image_url?: string | null;
+            original_animation_url?: string | null;
             traits: components["schemas"]["Trait"][];
             /** Format: double */
-            estimated_value_usd?: number;
+            estimated_value_usd?: number | null;
             /** Format: int32 */
-            decimals?: number;
-            animation_url?: string;
+            decimals?: number | null;
+            animation_url?: string | null;
             is_suspicious: boolean;
             creator: string;
             owners: components["schemas"]["Owner"][];
-            rarity?: components["schemas"]["Rarity"];
-            subscription?: components["schemas"]["SubscriptionInfoResponse"];
-            agent_binding?: components["schemas"]["AgentBindingResponse"];
+            rarity?: components["schemas"]["Rarity"] | null;
+            subscription?: components["schemas"]["SubscriptionInfoResponse"] | null;
+            agent_binding?: components["schemas"]["AgentBindingResponse"] | null;
         };
         Owner: {
             address: string;
@@ -4272,21 +4272,21 @@ export interface components {
             strategy_id: string;
             strategy_version: string;
             /** Format: int64 */
-            rank?: number;
+            rank?: number | null;
         };
         SubscriptionInfoResponse: {
             /**
              * Format: double
              * @description Unix timestamp in seconds, including fractional seconds
              */
-            expires_at?: number;
+            expires_at?: number | null;
             is_renewable: boolean;
             is_expired: boolean;
         };
         Trait: {
             trait_type: string;
-            display_type?: string;
-            max_value?: string;
+            display_type?: string | null;
+            max_value?: string | null;
             value: unknown;
         };
         /** @description Payment token to use for a cross-chain transaction */
@@ -4502,13 +4502,13 @@ export interface components {
             /** @description Item name */
             name: string;
             /** @description Item description */
-            description?: string;
+            description?: string | null;
             /** @description Item image URL */
             image_url: string;
             /** @description Image media token */
             media_token: string;
             /** @description Item media type */
-            media_type?: string;
+            media_type?: string | null;
         };
         /** @description Request body for saving a prereveal drop item */
         SavePrerevealDropItemRequest: {
@@ -4682,25 +4682,25 @@ export interface components {
         CollectionResponse: {
             collection: string;
             name: string;
-            description?: string;
+            description?: string | null;
             /** @description Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own. */
-            image_url?: string;
+            image_url?: string | null;
             /** @description Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived. */
             banner_image_url?: string | null;
-            owner?: string;
+            owner?: string | null;
             safelist_status: string;
-            category?: string;
+            category?: string | null;
             is_disabled: boolean;
             is_nsfw: boolean;
             trait_offers_enabled: boolean;
             collection_offers_enabled: boolean;
             opensea_url: string;
-            project_url?: string;
-            wiki_url?: string;
-            discord_url?: string;
-            telegram_url?: string;
-            twitter_username?: string;
-            instagram_username?: string;
+            project_url?: string | null;
+            wiki_url?: string | null;
+            discord_url?: string | null;
+            telegram_url?: string | null;
+            twitter_username?: string | null;
+            instagram_username?: string | null;
             contracts: components["schemas"]["Contract"][];
         };
         Contract: {
@@ -4710,9 +4710,9 @@ export interface components {
         MetadataIngestionError: {
             errorType: string;
             message: string;
-            url?: string;
+            url?: string | null;
             /** Format: int32 */
-            statusCode?: number;
+            statusCode?: number | null;
         };
         ValidateMetadataAssetIdentifier: {
             chain: string;
@@ -4722,24 +4722,24 @@ export interface components {
         ValidateMetadataAttribute: {
             traitType: string;
             value: string;
-            displayType?: string;
+            displayType?: string | null;
         };
         ValidateMetadataDetails: {
-            name?: string;
-            description?: string;
-            originalImageUrl?: string;
-            processedImageUrl?: string;
-            originalAnimationUrl?: string;
-            processedAnimationUrl?: string;
-            externalUrl?: string;
-            backgroundColor?: string;
+            name?: string | null;
+            description?: string | null;
+            originalImageUrl?: string | null;
+            processedImageUrl?: string | null;
+            originalAnimationUrl?: string | null;
+            processedAnimationUrl?: string | null;
+            externalUrl?: string | null;
+            backgroundColor?: string | null;
             attributes: components["schemas"]["ValidateMetadataAttribute"][];
         };
         ValidateMetadataResponse: {
             assetIdentifier: components["schemas"]["ValidateMetadataAssetIdentifier"];
-            tokenUri?: string;
-            metadata?: components["schemas"]["ValidateMetadataDetails"];
-            error?: components["schemas"]["MetadataIngestionError"];
+            tokenUri?: string | null;
+            metadata?: components["schemas"]["ValidateMetadataDetails"] | null;
+            error?: components["schemas"]["MetadataIngestionError"] | null;
         };
         /** @description Instant API key response */
         InstantApiKeyResponse: {
@@ -4845,7 +4845,7 @@ export interface components {
             agent_account_id: string;
             owner_account_id: string;
             status: string;
-            awaiting_confirmation_from?: string;
+            awaiting_confirmation_from?: string | null;
             /**
              * Format: double
              * @description Unix timestamp in seconds, including fractional seconds
@@ -4855,7 +4855,7 @@ export interface components {
              * Format: double
              * @description Unix timestamp in seconds, including fractional seconds
              */
-            confirmed_at?: number;
+            confirmed_at?: number | null;
         };
         ConfirmAgentRelationshipRequestBody: {
             /** @description The other party's account id. Preferred over an address. */
@@ -4884,11 +4884,11 @@ export interface components {
         /** @description Response for updating profile settings */
         UpdateProfileSettingsResponse: {
             /** @description Display name */
-            displayName?: string;
+            displayName?: string | null;
             /** @description Profile bio */
-            bio?: string;
+            bio?: string | null;
             /** @description Profile external URL */
-            externalUrl?: string;
+            externalUrl?: string | null;
         };
         /** @description Response body for a profile shelf action */
         ProfileShelfActionResponse: {
@@ -4931,9 +4931,9 @@ export interface components {
             /** @description Token ID */
             token_id: string;
             /** @description Item name */
-            name?: string;
+            name?: string | null;
             /** @description Item description */
-            description?: string;
+            description?: string | null;
             /** @description Item image URL */
             image_url: string;
             /** @description Item attributes */
@@ -4943,9 +4943,9 @@ export interface components {
             /** @description Contract standard */
             contract_standard: string;
             /** @description External URL */
-            external_url?: string;
+            external_url?: string | null;
             /** @description Animated media for the item, alongside its image */
-            animation_url?: string;
+            animation_url?: string | null;
             /** @description Chain identifier */
             chain: string;
             /** @description Contract address */
@@ -5269,8 +5269,8 @@ export interface components {
             creator: string;
             metadata_uri: string;
             manifest_hash: string;
-            endpoint_url?: string;
-            endpoint_domain?: string;
+            endpoint_url?: string | null;
+            endpoint_domain?: string | null;
             manifest_hash_verified: boolean;
             is_active: boolean;
             created_at: string;
@@ -5278,7 +5278,7 @@ export interface components {
         };
         ToolListPaginatedResponse: {
             tools: components["schemas"]["ToolListItemResponse"][];
-            next?: string;
+            next?: string | null;
         };
         RegisteredToolResponse: {
             tool_id: string;
@@ -5316,7 +5316,7 @@ export interface components {
         ToolCollectionResponse: {
             slug: string;
             name: string;
-            image_url?: string;
+            image_url?: string | null;
             opensea_url: string;
             contracts: components["schemas"]["Contract"][];
         };
@@ -5366,7 +5366,7 @@ export interface components {
         };
         ToolActivityPaginatedResponse: {
             activity: components["schemas"]["ToolActivityEventResponse"][];
-            next?: string;
+            next?: string | null;
         };
         ToolPaymentStatsResponse: {
             /** Format: int64 */
@@ -5382,7 +5382,7 @@ export interface components {
         };
         ToolSearchPaginatedResponse: {
             results: components["schemas"]["ToolSearchResultResponse"][];
-            next?: string;
+            next?: string | null;
         };
         ToolSearchResultResponse: {
             tool_id: string;
@@ -5652,7 +5652,7 @@ export interface components {
              */
             name: string;
             /** @description URL of the collection image */
-            image_url?: string;
+            image_url?: string | null;
             /** @description Whether trading is disabled for this collection */
             is_disabled: boolean;
             /** @description Whether this collection is marked as NSFW */
@@ -5698,9 +5698,9 @@ export interface components {
             /** @description Contract address of the NFT */
             contract: string;
             /** @description Name of the NFT */
-            name?: string;
+            name?: string | null;
             /** @description URL of the NFT image */
-            image_url?: string;
+            image_url?: string | null;
             /** @description URL to the NFT on OpenSea */
             opensea_url: string;
             /** @description Cheapest listing for one unit of this NFT that can be filled through this API (OpenSea listings; other marketplaces are excluded). Null when there is none. */
@@ -5777,25 +5777,25 @@ export interface components {
         ListingOrOffer: unknown;
         OffersResponse: {
             offers: components["schemas"]["Offer"][];
-            next?: string;
+            next?: string | null;
         };
         AssetMetadataResponse: {
-            name?: string;
-            description?: string;
-            image?: string;
-            external_link?: string;
-            animation_url?: string;
+            name?: string | null;
+            description?: string | null;
+            image?: string | null;
+            external_link?: string | null;
+            animation_url?: string | null;
             traits: components["schemas"]["Trait"][];
             /** Format: int32 */
-            decimals?: number;
+            decimals?: number | null;
         };
         ListingsResponse: {
             listings: components["schemas"]["Listing"][];
-            next?: string;
+            next?: string | null;
         };
         AssetEventsResponse: {
             asset_events: (components["schemas"]["OrderEvent"] | components["schemas"]["SaleEvent"] | components["schemas"]["TransferEvent"])[];
-            next?: string;
+            next?: string | null;
         };
         Event: unknown;
         EventBase: {
@@ -5819,15 +5819,15 @@ export interface components {
             payment?: components["schemas"]["Payment"];
             order_type: string;
             /** Format: int64 */
-            start_date?: number;
+            start_date?: number | null;
             /** Format: int64 */
-            expiration_date?: number;
-            asset?: components["schemas"]["Nft"];
+            expiration_date?: number | null;
+            asset?: components["schemas"]["Nft"] | null;
             /** Format: int64 */
             quantity: number;
             maker: string;
-            taker?: string;
-            criteria?: components["schemas"]["Criteria"];
+            taker?: string | null;
+            criteria?: components["schemas"]["Criteria"] | null;
             is_private_listing: boolean;
         };
         Payment: {
@@ -5852,7 +5852,7 @@ export interface components {
             buyer: string;
             /** Format: int64 */
             quantity: number;
-            nft?: components["schemas"]["Nft"];
+            nft?: components["schemas"]["Nft"] | null;
         };
         TransferEvent: components["schemas"]["Event"] & {
             event_type: string;
@@ -5866,7 +5866,7 @@ export interface components {
             transfer_type: string;
             from_address: string;
             to_address: string;
-            nft?: components["schemas"]["Nft"];
+            nft?: components["schemas"]["Nft"] | null;
             /** Format: int64 */
             quantity: number;
         };
@@ -5888,7 +5888,7 @@ export interface components {
              * @description Collection name
              * @example Cool Cats
              */
-            collection_name?: string;
+            collection_name?: string | null;
             /**
              * @description Blockchain the drop is on
              * @example ethereum
@@ -5904,7 +5904,7 @@ export interface components {
             /** @description Whether the drop is currently minting */
             is_minting: boolean;
             /** @description Collection image URL */
-            image_url?: string;
+            image_url?: string | null;
             /** @description OpenSea URL for the drop */
             opensea_url: string;
             /** @description The currently-minting stage, if the drop is live. Null if not minting. */
@@ -5922,9 +5922,9 @@ export interface components {
              */
             stage_type: string;
             /** @description Stage label/name */
-            label?: string;
+            label?: string | null;
             /** @description Mint price per token in wei (decimal string) */
-            price?: string;
+            price?: string | null;
             /** @description Currency contract address (e.g. 0x0000...0000 for native token) */
             price_currency_address: string;
             /** @description Stage start time (ISO 8601) */
@@ -5951,7 +5951,7 @@ export interface components {
              * @description Collection name
              * @example Cool Cats
              */
-            collection_name?: string;
+            collection_name?: string | null;
             /**
              * @description Blockchain the drop is on
              * @example ethereum
@@ -5967,7 +5967,7 @@ export interface components {
             /** @description Whether the drop is currently minting */
             is_minting: boolean;
             /** @description Collection image URL */
-            image_url?: string;
+            image_url?: string | null;
             /** @description OpenSea URL for the drop */
             opensea_url: string;
             /** @description The currently-minting stage, if the drop is live. Null if not minting. */
@@ -5977,9 +5977,9 @@ export interface components {
             /** @description Drop stages (public sale, presale, etc.) */
             stages: components["schemas"]["DropStageResponse"][];
             /** @description Total minted supply */
-            total_supply?: string;
+            total_supply?: string | null;
             /** @description Maximum supply */
-            max_supply?: string;
+            max_supply?: string | null;
         };
         /** @description Progress of a drop's IPFS metadata upload */
         DropMetadataUploadProgressResponse: {
@@ -6039,30 +6039,30 @@ export interface components {
         };
         CollectionPaginatedResponse: {
             collections: components["schemas"]["CollectionResponse"][];
-            next?: string;
+            next?: string | null;
         };
         CollectionDetailedResponse: {
             collection: string;
             name: string;
-            description?: string;
+            description?: string | null;
             /** @description Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own. */
-            image_url?: string;
+            image_url?: string | null;
             /** @description Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived. */
             banner_image_url?: string | null;
-            owner?: string;
+            owner?: string | null;
             safelist_status: string;
-            category?: string;
+            category?: string | null;
             is_disabled: boolean;
             is_nsfw: boolean;
             trait_offers_enabled: boolean;
             collection_offers_enabled: boolean;
             opensea_url: string;
-            project_url?: string;
-            wiki_url?: string;
-            discord_url?: string;
-            telegram_url?: string;
-            twitter_username?: string;
-            instagram_username?: string;
+            project_url?: string | null;
+            wiki_url?: string | null;
+            discord_url?: string | null;
+            telegram_url?: string | null;
+            twitter_username?: string | null;
+            instagram_username?: string | null;
             contracts: components["schemas"]["Contract"][];
             editors: string[];
             fees: components["schemas"]["Fee"][];
@@ -6254,7 +6254,7 @@ export interface components {
         };
         NftListResponse: {
             nfts: components["schemas"]["Nft"][];
-            next?: string;
+            next?: string | null;
         };
         /** @description List of supported blockchains */
         ChainListResponse: {
@@ -6529,7 +6529,7 @@ export interface components {
         };
         OwnersPaginatedResponse: {
             owners: components["schemas"]["Owner"][];
-            next?: string;
+            next?: string | null;
         };
         /** @description Analytics data for an NFT including sales and floor price history */
         NftAnalyticsResponse: {
@@ -6559,9 +6559,9 @@ export interface components {
         };
         AccountResponse: {
             address: string;
-            username?: string;
-            display_name?: string;
-            ens_name?: string;
+            username?: string | null;
+            display_name?: string | null;
+            ens_name?: string | null;
             is_verified: boolean;
             /** @description Whether this account has declared itself an agent. Self-declared and not OpenSea verification, and the declaration on its own confers nothing: see GET /api/v2/accounts/{address_or_username}/agent-relationships for the ownership relationship, which is likewise a declaration rather than an authorization. */
             is_agent: boolean;
@@ -6569,10 +6569,10 @@ export interface components {
             follower_count: number;
             /** Format: int64 */
             following_count: number;
-            nft_pfp?: components["schemas"]["NftPfpResponse"];
-            profile_image_url?: string;
-            banner_image_url?: string;
-            website?: string;
+            nft_pfp?: components["schemas"]["NftPfpResponse"] | null;
+            profile_image_url?: string | null;
+            banner_image_url?: string | null;
+            website?: string | null;
             social_media_accounts: components["schemas"]["SocialMediaAccount"][];
             bio: string;
             /** Format: date */
@@ -6588,17 +6588,17 @@ export interface components {
         };
         SocialProfilePageResponse: {
             profiles: components["schemas"]["SocialProfileSummaryResponse"][];
-            next?: string;
+            next?: string | null;
         };
         SocialProfileSummaryResponse: {
             address: string;
-            username?: string;
-            display_name?: string;
-            profile_image_url?: string;
+            username?: string | null;
+            display_name?: string | null;
+            profile_image_url?: string | null;
             is_verified: boolean;
             /** Format: int64 */
             follower_count: number;
-            nft_pfp?: components["schemas"]["NftPfpResponse"];
+            nft_pfp?: components["schemas"]["NftPfpResponse"] | null;
             is_following: boolean;
             is_watching: boolean;
         };
@@ -6612,9 +6612,9 @@ export interface components {
         /** @description Compact public profile summary for an agent relationship */
         AgentProfileSummaryResponse: {
             address: string;
-            username?: string;
-            display_name?: string;
-            profile_image_url?: string;
+            username?: string | null;
+            display_name?: string | null;
+            profile_image_url?: string | null;
             is_verified: boolean;
         };
         /** @description Resolved account info */
@@ -7071,36 +7071,36 @@ export interface components {
         ProfileCollectionResponse: {
             collection: string;
             name: string;
-            description?: string;
+            description?: string | null;
             /** @description Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own. */
-            image_url?: string;
+            image_url?: string | null;
             /** @description Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived. */
             banner_image_url?: string | null;
-            owner?: string;
+            owner?: string | null;
             safelist_status: string;
-            category?: string;
+            category?: string | null;
             is_disabled: boolean;
             is_nsfw: boolean;
             trait_offers_enabled: boolean;
             collection_offers_enabled: boolean;
             opensea_url: string;
-            project_url?: string;
-            wiki_url?: string;
-            discord_url?: string;
-            telegram_url?: string;
-            twitter_username?: string;
-            instagram_username?: string;
+            project_url?: string | null;
+            wiki_url?: string | null;
+            discord_url?: string | null;
+            telegram_url?: string | null;
+            twitter_username?: string | null;
+            instagram_username?: string | null;
             contracts: components["schemas"]["Contract"][];
             /** Format: int32 */
             item_count: number;
             /** Format: int32 */
             total_quantity: number;
             /** Format: double */
-            usd_value?: number;
+            usd_value?: number | null;
         };
         ProfileCollectionsResponse: {
             collections: components["schemas"]["ProfileCollectionResponse"][];
-            next?: string;
+            next?: string | null;
         };
         /** @description Result of removing a saved tool */
         SavedToolActionResponse: {

@@ -10727,7 +10727,7 @@
             "example": 30000
           },
           "refresh_after_ms": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32",
             "description": "Recommended delay in milliseconds before re-requesting this quote; absent when there is no actionable route",
             "example": 2000
@@ -10941,7 +10941,7 @@
         "description": "Metadata for a shelf item",
         "properties": {
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         }
       },
@@ -10953,13 +10953,13 @@
             "type": "string"
           },
           "account_address": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "title": {
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "display_order": {
             "type": "integer",
@@ -10972,13 +10972,13 @@
             }
           },
           "icon": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "view": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "single_item_shelf_side": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "shelf_item_metadata": {
             "type": "object",
@@ -11068,7 +11068,7 @@
             "type": "string"
           },
           "collection_slug": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "image_url": {
             "type": "string"
@@ -11323,25 +11323,39 @@
         "type": "object",
         "properties": {
           "collection": {
-            "$ref": "#/components/schemas/CollectionInner"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CollectionInner"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "contract": {
-            "$ref": "#/components/schemas/ContractInner"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContractInner"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "traits": {
-            "type": "array",
+            "type": ["array", "null"],
             "items": {
               "$ref": "#/components/schemas/TraitData"
             }
           },
           "numeric_traits": {
-            "type": "array",
+            "type": ["array", "null"],
             "items": {
               "$ref": "#/components/schemas/NumericTraitData"
             }
           },
           "encoded_token_ids": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         }
       },
@@ -11380,11 +11394,11 @@
             "type": "string"
           },
           "min": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "float"
           },
           "max": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "float"
           }
         },
@@ -11412,14 +11426,21 @@
                 "type": "string"
               },
               "asset": {
-                "$ref": "#/components/schemas/OrderAsset"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OrderAsset"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "remaining_quantity": {
                 "type": "integer",
                 "format": "int64"
               },
               "order_created_at": {
-                "type": "integer",
+                "type": ["integer", "null"],
                 "format": "int64"
               },
               "protocol": {
@@ -11431,7 +11452,14 @@
                 "description": "Identity of a Solana order, present in place of `order_hash`. A client that assumes `order_hash` is always set should read this field first and fall back to `order_hash`."
               },
               "criteria": {
-                "$ref": "#/components/schemas/Criteria"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Criteria"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "price": {
                 "$ref": "#/components/schemas/Price"
@@ -11468,14 +11496,21 @@
             "type": "string"
           },
           "asset": {
-            "$ref": "#/components/schemas/OrderAsset"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrderAsset"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "remaining_quantity": {
             "type": "integer",
             "format": "int64"
           },
           "order_created_at": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64"
           },
           "protocol": {
@@ -11493,7 +11528,7 @@
         "type": "object",
         "properties": {
           "identifier": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "contract": {
             "type": "string"
@@ -11587,7 +11622,7 @@
             "$ref": "#/components/schemas/Parameters"
           },
           "signature": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["parameters"]
@@ -11654,14 +11689,21 @@
                 "type": "string"
               },
               "asset": {
-                "$ref": "#/components/schemas/OrderAsset"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OrderAsset"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "remaining_quantity": {
                 "type": "integer",
                 "format": "int64"
               },
               "order_created_at": {
-                "type": "integer",
+                "type": ["integer", "null"],
                 "format": "int64"
               },
               "protocol": {
@@ -11773,22 +11815,36 @@
             "$ref": "#/components/schemas/CollectionCriteria"
           },
           "contract": {
-            "$ref": "#/components/schemas/ContractCriteria"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContractCriteria"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "trait": {
-            "$ref": "#/components/schemas/TraitCriteria",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraitCriteria"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "deprecated": true,
             "description": "Deprecated: Use 'traits' array instead which supports both single and multiple traits."
           },
           "traits": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Trait criteria for the offer. Each trait specifies a type and value that target NFTs must match. These traits are validated server-side at fulfillment time.",
             "items": {
               "$ref": "#/components/schemas/TraitCriteria"
             }
           },
           "numericTraits": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Numeric trait criteria for the offer. Each entry specifies a trait type with optional min/max range bounds. Can be combined with categorical traits.",
             "items": {
               "$ref": "#/components/schemas/NumericTraitCriteria"
@@ -11804,11 +11860,11 @@
             "type": "string"
           },
           "min": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double"
           },
           "max": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double"
           }
         },
@@ -12506,7 +12562,7 @@
             "type": "string"
           },
           "value_hex": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "input_data": {
             "oneOf": [
@@ -12863,7 +12919,7 @@
             "$ref": "#/components/schemas/AgentNftResponse"
           },
           "registered_by": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["agent", "agent_id", "binding_contract"]
@@ -12899,22 +12955,22 @@
             "type": "string"
           },
           "name": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "display_image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "display_animation_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "metadata_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "opensea_url": {
             "type": "string"
@@ -12929,10 +12985,10 @@
             "type": "boolean"
           },
           "original_image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "original_animation_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "traits": {
             "type": "array",
@@ -12941,11 +12997,11 @@
             }
           },
           "estimated_value_usd": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double"
           },
           "decimals": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32"
           }
         },
@@ -12989,22 +13045,22 @@
             "type": "string"
           },
           "name": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "display_image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "display_animation_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "metadata_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "opensea_url": {
             "type": "string"
@@ -13019,10 +13075,10 @@
             "type": "boolean"
           },
           "original_image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "original_animation_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "traits": {
             "type": "array",
@@ -13031,15 +13087,15 @@
             }
           },
           "estimated_value_usd": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double"
           },
           "decimals": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32"
           },
           "animation_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "is_suspicious": {
             "type": "boolean"
@@ -13054,13 +13110,34 @@
             }
           },
           "rarity": {
-            "$ref": "#/components/schemas/Rarity"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rarity"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "subscription": {
-            "$ref": "#/components/schemas/SubscriptionInfoResponse"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubscriptionInfoResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "agent_binding": {
-            "$ref": "#/components/schemas/AgentBindingResponse"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentBindingResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -13104,7 +13181,7 @@
             "type": "string"
           },
           "rank": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64"
           }
         },
@@ -13114,7 +13191,7 @@
         "type": "object",
         "properties": {
           "expires_at": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Unix timestamp in seconds, including fractional seconds"
           },
@@ -13134,10 +13211,10 @@
             "type": "string"
           },
           "display_type": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "max_value": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "value": {}
         },
@@ -13525,7 +13602,7 @@
             "description": "Item name"
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Item description"
           },
           "image_url": {
@@ -13537,7 +13614,7 @@
             "description": "Image media token"
           },
           "media_type": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Item media type"
           }
         },
@@ -13899,10 +13976,10 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own."
           },
           "banner_image_url": {
@@ -13910,13 +13987,13 @@
             "description": "Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived."
           },
           "owner": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "safelist_status": {
             "type": "string"
           },
           "category": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "is_disabled": {
             "type": "boolean"
@@ -13934,22 +14011,22 @@
             "type": "string"
           },
           "project_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "wiki_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "discord_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "telegram_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "twitter_username": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "instagram_username": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "contracts": {
             "type": "array",
@@ -13992,10 +14069,10 @@
             "type": "string"
           },
           "url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "statusCode": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32"
           }
         },
@@ -14026,7 +14103,7 @@
             "type": "string"
           },
           "displayType": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["traitType", "value"]
@@ -14035,28 +14112,28 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "originalImageUrl": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "processedImageUrl": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "originalAnimationUrl": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "processedAnimationUrl": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "externalUrl": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "backgroundColor": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "attributes": {
             "type": "array",
@@ -14074,13 +14151,27 @@
             "$ref": "#/components/schemas/ValidateMetadataAssetIdentifier"
           },
           "tokenUri": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "metadata": {
-            "$ref": "#/components/schemas/ValidateMetadataDetails"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValidateMetadataDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "error": {
-            "$ref": "#/components/schemas/MetadataIngestionError"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataIngestionError"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": ["assetIdentifier"]
@@ -14281,7 +14372,7 @@
             "type": "string"
           },
           "awaiting_confirmation_from": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "created_at": {
             "type": "number",
@@ -14289,7 +14380,7 @@
             "description": "Unix timestamp in seconds, including fractional seconds"
           },
           "confirmed_at": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Unix timestamp in seconds, including fractional seconds"
           }
@@ -14357,15 +14448,15 @@
         "description": "Response for updating profile settings",
         "properties": {
           "displayName": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Display name"
           },
           "bio": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Profile bio"
           },
           "externalUrl": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Profile external URL"
           }
         }
@@ -14474,11 +14565,11 @@
             "description": "Token ID"
           },
           "name": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Item name"
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Item description"
           },
           "image_url": {
@@ -14501,11 +14592,11 @@
             "description": "Contract standard"
           },
           "external_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "External URL"
           },
           "animation_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Animated media for the item, alongside its image"
           },
           "chain": {
@@ -15385,10 +15476,10 @@
             "type": "string"
           },
           "endpoint_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "endpoint_domain": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "manifest_hash_verified": {
             "type": "boolean"
@@ -15426,7 +15517,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["tools"]
@@ -15560,7 +15651,7 @@
             "type": "string"
           },
           "image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "opensea_url": {
             "type": "string"
@@ -15725,7 +15816,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["activity"]
@@ -15772,7 +15863,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["results"]
@@ -16273,7 +16364,7 @@
             "example": "Bored Ape Yacht Club"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the collection image"
           },
           "is_disabled": {
@@ -16343,11 +16434,11 @@
             "description": "Contract address of the NFT"
           },
           "name": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Name of the NFT"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the NFT image"
           },
           "opensea_url": {
@@ -16508,7 +16599,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["offers"]
@@ -16517,19 +16608,19 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "image": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "external_link": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "animation_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "traits": {
             "type": "array",
@@ -16538,7 +16629,7 @@
             }
           },
           "decimals": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32"
           }
         },
@@ -16554,7 +16645,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["listings"]
@@ -16579,7 +16670,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["asset_events"]
@@ -16647,15 +16738,22 @@
                 "type": "string"
               },
               "start_date": {
-                "type": "integer",
+                "type": ["integer", "null"],
                 "format": "int64"
               },
               "expiration_date": {
-                "type": "integer",
+                "type": ["integer", "null"],
                 "format": "int64"
               },
               "asset": {
-                "$ref": "#/components/schemas/Nft"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Nft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "quantity": {
                 "type": "integer",
@@ -16665,10 +16763,17 @@
                 "type": "string"
               },
               "taker": {
-                "type": "string"
+                "type": ["string", "null"]
               },
               "criteria": {
-                "$ref": "#/components/schemas/Criteria"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Criteria"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "is_private_listing": {
                 "type": "boolean"
@@ -16750,7 +16855,14 @@
                 "format": "int64"
               },
               "nft": {
-                "$ref": "#/components/schemas/Nft"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Nft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             }
           }
@@ -16805,7 +16917,14 @@
                 "type": "string"
               },
               "nft": {
-                "$ref": "#/components/schemas/Nft"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Nft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "quantity": {
                 "type": "integer",
@@ -16852,7 +16971,7 @@
             "example": "cool-cats"
           },
           "collection_name": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection name",
             "example": "Cool Cats"
           },
@@ -16875,7 +16994,7 @@
             "description": "Whether the drop is currently minting"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection image URL"
           },
           "opensea_url": {
@@ -16928,11 +17047,11 @@
             "example": "public_sale"
           },
           "label": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Stage label/name"
           },
           "price": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Mint price per token in wei (decimal string)"
           },
           "price_currency_address": {
@@ -16977,7 +17096,7 @@
             "example": "cool-cats"
           },
           "collection_name": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection name",
             "example": "Cool Cats"
           },
@@ -17000,7 +17119,7 @@
             "description": "Whether the drop is currently minting"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection image URL"
           },
           "opensea_url": {
@@ -17037,11 +17156,11 @@
             }
           },
           "total_supply": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Total minted supply"
           },
           "max_supply": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Maximum supply"
           }
         },
@@ -17158,7 +17277,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["collections"]
@@ -17173,10 +17292,10 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own."
           },
           "banner_image_url": {
@@ -17184,13 +17303,13 @@
             "description": "Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived."
           },
           "owner": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "safelist_status": {
             "type": "string"
           },
           "category": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "is_disabled": {
             "type": "boolean"
@@ -17208,22 +17327,22 @@
             "type": "string"
           },
           "project_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "wiki_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "discord_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "telegram_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "twitter_username": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "instagram_username": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "contracts": {
             "type": "array",
@@ -17640,7 +17759,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["nfts"]
@@ -18159,7 +18278,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["owners"]
@@ -18221,13 +18340,13 @@
             "type": "string"
           },
           "username": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "display_name": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "ens_name": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "is_verified": {
             "type": "boolean"
@@ -18245,16 +18364,23 @@
             "format": "int64"
           },
           "nft_pfp": {
-            "$ref": "#/components/schemas/NftPfpResponse"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NftPfpResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "profile_image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "banner_image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "website": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "social_media_accounts": {
             "type": "array",
@@ -18315,7 +18441,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["profiles"]
@@ -18327,13 +18453,13 @@
             "type": "string"
           },
           "username": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "display_name": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "profile_image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "is_verified": {
             "type": "boolean"
@@ -18343,7 +18469,14 @@
             "format": "int64"
           },
           "nft_pfp": {
-            "$ref": "#/components/schemas/NftPfpResponse"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NftPfpResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "is_following": {
             "type": "boolean"
@@ -18393,13 +18526,13 @@
             "type": "string"
           },
           "username": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "display_name": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "profile_image_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "is_verified": {
             "type": "boolean"
@@ -19163,10 +19296,10 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own."
           },
           "banner_image_url": {
@@ -19174,13 +19307,13 @@
             "description": "Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived."
           },
           "owner": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "safelist_status": {
             "type": "string"
           },
           "category": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "is_disabled": {
             "type": "boolean"
@@ -19198,22 +19331,22 @@
             "type": "string"
           },
           "project_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "wiki_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "discord_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "telegram_url": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "twitter_username": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "instagram_username": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "contracts": {
             "type": "array",
@@ -19230,7 +19363,7 @@
             "format": "int32"
           },
           "usd_value": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double"
           }
         },
@@ -19258,7 +19391,7 @@
             }
           },
           "next": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": ["collections"]
