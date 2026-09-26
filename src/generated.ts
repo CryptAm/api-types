@@ -631,9 +631,57 @@ export interface paths {
          *
          *     Together, 2 and 4 mean array order is not chronological order: the public stage is listed first and runs last, with the presales running in array order before it. A drop with two allowlist stages therefore sends `[public, presale1, presale2]` while time runs presale1, then presale2, then public. Rule 3 does not tie presale1 back to the public stage, which is why the chain reads forward from presale1 rather than from the array head.
          *
-         *     Per-wallet mint limits are cumulative across stages, so `max_total_mintable_by_wallet` on a later stage is a running total for the wallet rather than a fresh allowance.
+         *     Each stage's `max_total_mintable_by_wallet` is what that stage adds for a wallet, not a running total. Limits add up across the stages a wallet is listed on, the public stage adds its own limit on top, and mints a wallet leaves unused carry into later stages. So presales of 2 and 1 plus a public limit of 1 let a wallet on both lists mint 4.
          */
         post: operations["save_drop_edits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/drops/{slug}/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build unpublish transaction data for a drop
+         * @description Returns a ready-to-sign transaction that closes a live ERC-721 SeaDrop V1 drop by replacing its stages with one that has already ended. Only the collection owner can call this endpoint, and the transaction must be sent from `from`.
+         *
+         *     This saves that ended stage as the drop's draft before returning, replacing any edits saved with POST /api/v2/drops/{slug}. If the transaction is never sent, save new edits before publishing again.
+         */
+        post: operations["build_drop_unpublish_transaction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/drops/{slug}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build publish transaction data for a drop
+         * @description Returns a ready-to-sign transaction that applies the drop's saved edits onchain: stages, supply, base URI, payout, and the OpenSea signer, fee recipient, and payers the drop needs. Every value is computed by OpenSea; do not build or change this calldata yourself, or signed presales stop validating.
+         *
+         *     Send the transaction from `from`, the contract's onchain owner. Only the collection owner can call this endpoint.
+         *
+         *     A 400 carries the reason the drop cannot be published, for example that it is disabled, its launch date is still pending, or it has no saved edits to apply. After a first publish, the drop is live once GET /api/v2/drops/{slug} returns it, which happens after the transaction is mined and indexed.
+         *
+         *     To reveal, run POST /api/v2/drops/{slug}/metadata/ipfs, wait for it to complete, then call this endpoint again to put the new base URI onchain.
+         */
+        post: operations["build_drop_publish_transaction"];
         delete?: never;
         options?: never;
         head?: never;
@@ -674,6 +722,28 @@ export interface paths {
          * @description Returns ready-to-sign transaction data for minting tokens from a drop. The caller is responsible for signing and submitting the transaction. No wallet authentication is required — only an API key. The minter address in the request body determines who will receive the tokens. Stage selection is handled automatically by the backend — if multiple stages are active, the first eligible stage is used.
          */
         post: operations["build_drop_mint_transaction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/drops/{slug}/metadata/ipfs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload drop metadata to IPFS
+         * @description Uploads every saved item's media and metadata to IPFS, then saves the resulting folder as the drop's draft base URI. Run it after POST /api/v2/drops/{slug}/items/media/save; the drop needs at least one item. It does not change the contract: call POST /api/v2/drops/{slug}/publish once it completes.
+         *
+         *     Only one upload runs per drop at a time. Calling again while one is running returns that upload's id. Poll GET /api/v2/drops/{slug}/metadata/ipfs/{workflow_execution_id} until status is completed or failed.
+         */
+        post: operations["upload_drop_metadata_to_ipfs"];
         delete?: never;
         options?: never;
         head?: never;
@@ -740,6 +810,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/drops/{slug}/items/manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload drop metadata manifest
+         * @description The file is a CSV describing every item in the drop, one row per uploaded media file. Required columns are tokenID, name, description, and file_name, where file_name matches the filename passed to POST /api/v2/drops/{slug}/items/media. Optional columns are external_url, animation_url, and one attributes[<trait type>] column per trait. Upload it in two steps. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Unlike other upload contexts, the returned token is not passed to any later call: the file is stored against the drop, and the next POST /api/v2/drops/{slug}/items/media/save reads it. Send one media token per row there, because the save keeps only the files the manifest names. Without a manifest, items get token ids 1 to n in upload order, named #1 to #n, with no description or traits.
+         */
+        post: operations["upload_drop_collection_manifest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/drops/{slug}/cross_chain_mint": {
         parameters: {
             query?: never;
@@ -771,7 +861,7 @@ export interface paths {
         put?: never;
         /**
          * Upload drop allowlist
-         * @description The file is CSV with a header row, and the wallet column must be named address or walletaddress. Optional per-row columns are a custom mint limit and a custom price. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Pass the token as allowlist_file_token to POST /api/v2/drops/{slug}/allowlist/validate, which returns a different token. That second token is the one a stage takes: send it as allowlist_file_token on the stage in POST /api/v2/drops/{slug}, or the uploaded file is never attached to anything. The presigned upload expires about a minute after it is issued, so request the context and upload in one go rather than requesting it ahead of time.
+         * @description The file is CSV with a header row, and the wallet column must be named address or walletaddress. Optional per-row columns are a custom mint limit and a custom price. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Send the token as allowlist_file_token on the stage in POST /api/v2/drops/{slug}; saving the edits validates the file and rejects them if it is invalid. POST /api/v2/drops/{slug}/allowlist/validate runs the same check without saving and returns the same token. The allowlist is enforced once the drop is published with POST /api/v2/drops/{slug}/publish. The presigned upload expires about a minute after it is issued, so request the context and upload in one go rather than requesting it ahead of time.
          */
         post: operations["upload_drop_allowlist"];
         delete?: never;
@@ -1127,7 +1217,7 @@ export interface paths {
         head?: never;
         /**
          * Set collection visibility
-         * @description Hide or unhide a collection.
+         * @description Hide or unhide a collection. Only the collection owner can change visibility. A collection whose minted tokens are held by more than one wallet cannot be hidden; the request fails with 400 and says so.
          */
         patch: operations["set_collection_visibility"];
         trace?: never;
@@ -1698,6 +1788,26 @@ export interface paths {
          * @description Get a list of NFT drops (mints) by type: featured, upcoming, or recently_minted. Results may be fewer than the requested limit due to post-fetch filtering.
          */
         get: operations["get_drops"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/drops/{slug}/metadata/ipfs/{workflow_execution_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get drop IPFS metadata upload progress
+         * @description Progress of an upload started by POST /api/v2/drops/{slug}/metadata/ipfs. Poll every 15 seconds or slower while status is running.
+         */
+        get: operations["get_drop_metadata_ipfs_progress"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2675,16 +2785,36 @@ export interface components {
          * @enum {string}
          */
         ChainIdentifier: "blast" | "base" | "ethereum" | "zora" | "arbitrum" | "sei" | "avalanche" | "polygon" | "optimism" | "ape_chain" | "flow" | "b3" | "soneium" | "ronin" | "bera_chain" | "solana" | "shape" | "unichain" | "gunzilla" | "abstract" | "animechain" | "hyperevm" | "somnia" | "monad" | "hyperliquid" | "megaeth" | "ink" | "robinhood" | "stablechain" | "arc";
+        /** @description Ready-to-sign drop transaction */
+        DropTransactionResponse: {
+            /** @description Transaction target contract address */
+            to: string;
+            /** @description Address the transaction must be sent from: the contract's onchain owner. Sent from any other address it reverts. */
+            from: string;
+            /** @description Encoded transaction data (hex) */
+            data: string;
+            /** @description Transaction value in wei */
+            value: string;
+            /** @description Chain identifier */
+            chain: string;
+        };
         /** @description Ready-to-sign SelfMint drop item transaction data */
         SelfMintDropItemResponse: {
             /** @description Transaction target contract address */
             to: string;
+            /** @description Address the transaction must be sent from: the contract's onchain owner. Sent from any other address it reverts. */
+            from: string;
             /** @description Encoded transaction data (hex) */
             data: string;
-            /** @description Transaction value in wei (hex) */
+            /** @description Transaction value in wei */
             value: string;
             /** @description Chain identifier */
             chain: string;
+            /**
+             * @description Token id of the item. On a create it is the id OpenSea assigned; the item mints under it once the transaction is mined.
+             * @example 1
+             */
+            token_id: string;
         };
         V1ErrorWrapper: {
             errors: string[];
@@ -2703,13 +2833,13 @@ export interface components {
             /** @description Item name */
             name: string;
             /** @description Item description */
-            description?: string;
+            description?: string | null;
             /** @description External URL */
-            external_url?: string;
+            external_url?: string | null;
             /** @description Animated media for the item, alongside its image. Omit to leave the stored value alone; send an empty string to remove it. */
-            animation_url?: string;
+            animation_url?: string | null;
             /** @description Item traits */
-            traits?: components["schemas"]["SelfMintDropItemTraitRequest"][];
+            traits?: components["schemas"]["SelfMintDropItemTraitRequest"][] | null;
         };
         WalletVisibilityResponse: {
             address: string;
@@ -2730,15 +2860,15 @@ export interface components {
              * @description Blockchain chain slug
              * @example ethereum
              */
-            chain?: string;
+            chain?: string | null;
             /** @description Contract address */
-            contract_address?: string;
+            contract_address?: string | null;
             /** @description Token ID */
-            token_id?: string;
+            token_id?: string | null;
             /** @description Collection slug */
-            slug?: string;
+            slug?: string | null;
             /** @description Perpetual ID */
-            id?: string;
+            id?: string | null;
         };
         /** @description Response for a favorites write operation */
         FavoriteResponse: {
@@ -2761,7 +2891,7 @@ export interface components {
              * @description Token ID for NFTs
              * @example 1234
              */
-            token_id?: string;
+            token_id?: string | null;
             /**
              * @description Amount in base units (wei/lamports)
              * @example 1000000000000000000
@@ -2773,7 +2903,7 @@ export interface components {
             /** @description Assets being sent/spent */
             from_assets: components["schemas"]["AssetQuantityInput"][];
             /** @description Assets being received */
-            to_assets?: components["schemas"]["AssetQuantityInput"][];
+            to_assets?: components["schemas"]["AssetQuantityInput"][] | null;
         };
         /** @description A transaction identifier with optional swap provider */
         TransactionIdentifierInput: {
@@ -2791,18 +2921,18 @@ export interface components {
              * @description The swap provider used (e.g. RELAY, JUPITER, ZERO_EX, LOCAL_BUY_NFT). Required when relay_request_id is not provided. Can be omitted for cross-chain flows that use relay_request_id.
              * @example RELAY
              */
-            swap_provider?: string;
+            swap_provider?: string | null;
         };
         /** @description Request to get a transaction receipt/status */
         TransactionReceiptRequest: {
             /** @description Transaction identifiers to look up */
-            transaction_identifiers?: components["schemas"]["TransactionIdentifierInput"][];
+            transaction_identifiers?: components["schemas"]["TransactionIdentifierInput"][] | null;
             /** @description The swap quote that was originally submitted */
             swap_quote: components["schemas"]["SwapQuoteInput"];
             /** @description Relay request ID for cross-chain tracking */
-            relay_request_id?: string;
+            relay_request_id?: string | null;
             /** @description Request ID for workflow tracking */
-            request_id?: string;
+            request_id?: string | null;
         };
         /** @description Asset identifier with chain, contract address, and optional token ID */
         AssetIdentifierResponse: {
@@ -2820,7 +2950,7 @@ export interface components {
              * @description Token ID for NFTs
              * @example 1234
              */
-            token_id?: string;
+            token_id?: string | null;
         };
         /** @description Receipt for a single asset in a transaction */
         AssetReceiptResponse: {
@@ -2845,7 +2975,7 @@ export interface components {
              * @description Token symbol
              * @example ETH
              */
-            currency?: string;
+            currency?: string | null;
             /**
              * @description USD equivalent
              * @example 19250.0
@@ -2865,7 +2995,7 @@ export interface components {
              */
             status: string;
             /** @description Reason for failure, if applicable */
-            fail_reason?: string;
+            fail_reason?: string | null;
             /** @description Successfully received assets */
             asset_receipts: components["schemas"]["AssetReceiptResponse"][];
             /** @description Assets that failed to be received */
@@ -2875,7 +3005,7 @@ export interface components {
             /** @description Assets that are missing from the receipt */
             missing_assets: components["schemas"]["AssetIdentifierResponse"][];
             /** @description Whether a cross-chain refund was issued */
-            cross_chain_refunded?: boolean;
+            cross_chain_refunded?: boolean | null;
         };
         Eip3009Fields: {
             caller_address?: string;
@@ -2954,7 +3084,7 @@ export interface components {
              */
             symbol: string;
             /** @description URL of the token's image */
-            image_url?: string;
+            image_url?: string | null;
             /**
              * @description Current price in USD
              * @example 1.0
@@ -2995,7 +3125,7 @@ export interface components {
              */
             symbol: string;
             /** @description URL of the token's image */
-            image_url?: string;
+            image_url?: string | null;
             /**
              * @description Current price in USD
              * @example 1.0
@@ -3010,40 +3140,40 @@ export interface components {
             /** @description URL to the token page on OpenSea */
             opensea_url: string;
             /** @description A description of the token */
-            description?: string;
+            description?: string | null;
             /**
              * @description Source of the description. `TOKEN_METADATA` is supplied by token metadata; `AI_GENERATED` is OpenSea's generated token-page description.
-             * @enum {string}
+             * @enum {string|null}
              */
-            description_source?: "TOKEN_METADATA" | "AI_GENERATED";
+            description_source?: "TOKEN_METADATA" | "AI_GENERATED" | null;
             /**
              * Format: double
              * @description When an AI-generated description was generated
              */
-            description_generated_at?: number;
+            description_generated_at?: number | null;
             /** @description Sources used for an AI-generated description */
-            description_sources?: string[];
+            description_sources?: string[] | null;
             /** @description Market statistics for the token */
-            stats?: components["schemas"]["TokenStatsResponse"];
+            stats?: components["schemas"]["TokenStatsResponse"] | null;
             /** @description Social media links for the token */
-            socials?: components["schemas"]["TokenSocialsResponse"];
+            socials?: components["schemas"]["TokenSocialsResponse"] | null;
             /**
              * Format: int64
              * @description Number of token holders
              */
-            holders_count?: number;
+            holders_count?: number | null;
             /** @description Whether OpenSea has verified the token */
             is_verified: boolean;
             /**
              * Format: double
              * @description When OpenSea first recorded the token
              */
-            created_at?: number;
+            created_at?: number | null;
             /**
              * Format: double
              * @description Earliest known onchain activity for the token
              */
-            genesis_date?: number;
+            genesis_date?: number | null;
             /**
              * @description Token safety status based on OpenSea's spam-classification rules. `OK` for tokens that pass all safety checks (the normal case). Categories are intentionally broad and may evolve. Possible values, in decreasing severity: `WARNING` (flagged as risky/suspicious — caution advised), `SPAM` (flagged as spam), `LOW_LIQUIDITY` (insufficient liquidity pool reserves), `OK` (passes all checks).
              * @default OK
@@ -3054,18 +3184,18 @@ export interface components {
         /** @description Social media links for a token */
         TokenSocialsResponse: {
             /** @description The token's website URL */
-            website?: string;
+            website?: string | null;
             /** @description The token's subreddit identifier */
-            subreddit_identifier?: string;
+            subreddit_identifier?: string | null;
             /** @description The token's Twitter/X handle */
-            twitter_handle?: string;
+            twitter_handle?: string | null;
             /** @description The token's Telegram identifier */
-            telegram_identifier?: string;
+            telegram_identifier?: string | null;
             /**
              * Format: int64
              * @description Twitter/X follower count
              */
-            twitter_follower_count?: number;
+            twitter_follower_count?: number | null;
         };
         /** @description Market statistics for a token */
         TokenStatsResponse: {
@@ -3073,52 +3203,52 @@ export interface components {
              * Format: double
              * @description Market capitalization in USD
              */
-            market_cap_usd?: number;
+            market_cap_usd?: number | null;
             /**
              * Format: double
              * @description Fully diluted valuation in USD
              */
-            fdv_usd?: number;
+            fdv_usd?: number | null;
             /**
              * Format: double
              * @description Circulating supply of the token
              */
-            circulating_supply?: number;
+            circulating_supply?: number | null;
             /**
              * Format: double
              * @description Maximum supply of the token
              */
-            max_supply?: number;
+            max_supply?: number | null;
             /**
              * Format: double
              * @description Total supply of the token
              */
-            total_supply?: number;
+            total_supply?: number | null;
             /**
              * Format: double
              * @description 24-hour trading volume in USD
              */
-            volume_24h?: number;
+            volume_24h?: number | null;
             /**
              * Format: double
              * @description Price change percentage over the last hour
              */
-            price_change_1h?: number;
+            price_change_1h?: number | null;
             /**
              * Format: double
              * @description Price change percentage over the last 24 hours
              */
-            price_change_24h?: number;
+            price_change_24h?: number | null;
             /**
              * Format: double
              * @description Price change percentage over the last 7 days
              */
-            price_change_7d?: number;
+            price_change_7d?: number | null;
             /**
              * Format: double
              * @description Price change percentage over the last 30 days
              */
-            price_change_30d?: number;
+            price_change_30d?: number | null;
         };
         /** @description An asset to swap with chain, contract address, and amount */
         SwapAssetInput: {
@@ -3150,13 +3280,13 @@ export interface components {
              */
             address: string;
             /** @description Recipient address (defaults to sender address) */
-            recipient?: string;
+            recipient?: string | null;
             /**
              * Format: double
              * @description Slippage tolerance as a decimal (0.0 to 0.5, default: 0.01)
              * @example 0.01
              */
-            slippage_tolerance?: number;
+            slippage_tolerance?: number | null;
         };
         /** @description An account referenced by a Solana instruction */
         SvmInstructionAccountResponse: {
@@ -3183,7 +3313,7 @@ export interface components {
              * @description Hex-encoded instruction payload, optionally 0x-prefixed
              * @example 01020304
              */
-            data?: string;
+            data?: string | null;
         };
         /** @description Compute budget a v1 Solana message carries inline instead of as instructions */
         SvmTransactionConfigResponse: {
@@ -3191,23 +3321,23 @@ export interface components {
              * @description Total priority fee in lamports, as a decimal string
              * @example 5000
              */
-            priority_fee_lamports?: string;
+            priority_fee_lamports?: string | null;
             /**
              * Format: int32
              * @description Compute unit limit
              * @example 200000
              */
-            compute_unit_limit?: number;
+            compute_unit_limit?: number | null;
             /**
              * Format: int32
              * @description Loaded accounts data size limit in bytes
              */
-            loaded_accounts_data_size_limit?: number;
+            loaded_accounts_data_size_limit?: number | null;
             /**
              * Format: int32
              * @description Requested heap frame size in bytes
              */
-            heap_size_bytes?: number;
+            heap_size_bytes?: number | null;
         };
         /** @description Everything needed to compile and sign a Solana v0 transaction. The client supplies a recent blockhash. */
         SvmTransactionDetailsResponse: {
@@ -3218,7 +3348,7 @@ export interface components {
             /** @description Base58-encoded address lookup tables the compiled message must reference to stay under the transaction size limit */
             address_lookup_tables: string[];
             /** @description Present only when the transaction may be compiled as a v1 message. A v1 compiler drops the ComputeBudget instructions from `instructions` and places these values in the message header; legacy/v0 compilers ignore this field */
-            transaction_config?: components["schemas"]["SvmTransactionConfigResponse"];
+            transaction_config?: components["schemas"]["SvmTransactionConfigResponse"] | null;
         };
         /** @description A cost component of the swap */
         SwapCostResponse: {
@@ -3293,18 +3423,18 @@ export interface components {
              */
             marketplace_fee_bps: number;
             /** @description Price impact of the swap (null if unavailable) */
-            price_impact?: components["schemas"]["SwapPriceImpact"];
+            price_impact?: components["schemas"]["SwapPriceImpact"] | null;
             /**
              * @description The swap provider that fulfilled this quote (null if unavailable)
              * @example RELAY
              */
-            swap_provider?: string;
+            swap_provider?: string | null;
             /**
              * Format: double
              * @description Recommended slippage tolerance based on volatility analysis (null if unavailable)
              * @example 2
              */
-            recommended_slippage?: number;
+            recommended_slippage?: number | null;
             /** @description Breakdown of costs for the swap */
             costs: components["schemas"]["SwapCostResponse"][];
             /** @description Errors encountered for individual swap routes */
@@ -3326,17 +3456,17 @@ export interface components {
              */
             chain: string;
             /** @description The destination address for the transaction */
-            to?: string;
+            to?: string | null;
             /** @description The transaction data. For EVM chains: hex-encoded calldata. For SVM chains: comma-separated instructions in programId:data format. */
             data: string;
             /** @description The native token value to send with the transaction (decimal) */
-            value?: string;
+            value?: string | null;
             /** @description The native token value to send with the transaction (hex, 0x-prefixed) */
-            value_hex?: string;
+            value_hex?: string | null;
             /** @description Structured Solana transaction contents. Set for SVM chains only; `data` is a lossy summary of the same instructions. */
-            svm?: components["schemas"]["SvmTransactionDetailsResponse"];
+            svm?: components["schemas"]["SvmTransactionDetailsResponse"] | null;
             /** @description Gas limit for the transaction, in gas units. Already includes a safety buffer over the estimate — use it as-is (or take the max of this and your own buffered estimate) and do not shrink it. Null when no reliable estimate is available. */
-            gas_limit?: string;
+            gas_limit?: string | null;
         };
         /** @description A registered tool to save or remove from saved tools */
         SavedToolRequest: {
@@ -3359,7 +3489,7 @@ export interface components {
              * @description Saved-tools toolkit name
              * @example All
              */
-            toolkit_name?: string;
+            toolkit_name?: string | null;
         };
         /** @description A tool saved by the authenticated account */
         SavedToolResponse: {
@@ -3413,14 +3543,14 @@ export interface components {
             /** @description Shelf title */
             title: string;
             /** @description Shelf description */
-            description?: string;
+            description?: string | null;
             items: components["schemas"]["ProfileShelfItemRequest"][];
             /** @description Shelf icon */
-            icon?: string;
+            icon?: string | null;
             /** @description Shelf view */
-            view?: string;
+            view?: string | null;
             /** @description Single-item shelf side */
-            single_item_shelf_side?: string;
+            single_item_shelf_side?: string | null;
         };
         /** @description A shelf item identifier */
         ProfileShelfItemRequest: {
@@ -3747,12 +3877,12 @@ export interface components {
              * Format: int64
              * @description Optional quantity of units to fulfill; defaults to 1 for offers
              */
-            units_to_fill?: number;
+            units_to_fill?: number | null;
             /**
              * @description Whether to include optional creator fees in the fulfillment. If creator fees are already required, this is a no-op. Defaults to false.
              * @default false
              */
-            include_optional_creator_fees: boolean;
+            include_optional_creator_fees: boolean | null;
         };
         OfferObject: {
             hash: string;
@@ -3912,7 +4042,7 @@ export interface components {
             value_hex?: string;
             input_data: components["schemas"]["FulfillAdvancedOrder"] | components["schemas"]["FulfillAvailableAdvancedOrders"] | components["schemas"]["FulfillAvailableOrders"] | components["schemas"]["FulfillBasicOrder"] | components["schemas"]["FulfillOrder"] | components["schemas"]["MatchAdvancedOrders"] | components["schemas"]["MatchOrders"];
             /** @description 4-byte hex attribution suffix (e.g. 0xcdb44011) to append to the ABI-encoded calldata before submitting the transaction onchain. Appending this suffix attributes the fill to OpenSea; omitting it does not affect execution. */
-            calldata_suffix?: string;
+            calldata_suffix?: string | null;
         };
         Type: {
             value?: unknown;
@@ -3959,7 +4089,7 @@ export interface components {
             /** @description The criteria to pass through to the POST /api/v2/offers submit step. Includes collection and trait information so trait offers are not accidentally submitted as collection offers. */
             criteria: components["schemas"]["CriteriaRequest"];
             /** @description Encoded token IDs that can be used to fulfill the criteria offer. When identifierOrCriteria is '0', this field is informational only and not required for order construction. */
-            encodedTokenIds?: string;
+            encodedTokenIds?: string | null;
         };
         Consideration: {
             /** Format: int32 */
@@ -4015,14 +4145,14 @@ export interface components {
              * @description Offer start time in ISO 8601 format. Defaults to now.
              * @example 2026-05-01T00:00:00Z
              */
-            start_time?: string;
+            start_time?: string | null;
             /**
              * @description Offer end time in ISO 8601 format. Defaults to 30 days from start.
              * @example 2026-06-01T00:00:00Z
              */
-            end_time?: string;
+            end_time?: string | null;
             /** @description Whether to include optional creator fees. Defaults to false. */
-            use_creator_fee?: boolean;
+            use_creator_fee?: boolean | null;
         };
         /** @description Price for a listing item */
         ListingPriceInput: {
@@ -4198,14 +4328,14 @@ export interface components {
              */
             buyer: string;
             /** @description Optional recipient address for the purchased items */
-            recipient?: string;
+            recipient?: string | null;
         };
         /** @description Response containing ordered blockchain actions to execute for a collection sweep */
         SweepCollectionResponse: {
             /** @description Ordered list of blockchain actions to execute. Each action is a JSON object with a single field indicating the type (e.g. buyItemAction, permit2SignatureAction, paymentApprovalAction) and its associated data. Serialized using proto3 JSON format — fields with default values (empty string, 0, false) may be omitted. */
             steps: components["schemas"]["JsonNode"][];
             /** @description Errors encountered during sweep. Present alongside steps for partial success cases (e.g. some listings became unavailable). */
-            errors?: components["schemas"]["SweepError"][];
+            errors?: components["schemas"]["SweepError"][] | null;
         };
         /** @description An error encountered during a sweep operation */
         SweepError: {
@@ -4221,12 +4351,12 @@ export interface components {
              * Format: int64
              * @description Optional quantity of units to fulfill; defaults to remaining units for listings
              */
-            units_to_fill?: number;
+            units_to_fill?: number | null;
             /**
              * @description Whether to include optional creator fees in the fulfillment. If creator fees are already required, this is a no-op. Defaults to false.
              * @default false
              */
-            include_optional_creator_fees: boolean;
+            include_optional_creator_fees: boolean | null;
         };
         ListingObject: {
             hash: string;
@@ -4241,7 +4371,7 @@ export interface components {
             /** @description The token to pay with */
             payment: components["schemas"]["CrossChainPaymentToken"];
             /** @description Optional recipient address for the purchased items */
-            recipient?: string;
+            recipient?: string | null;
         };
         /** @description Response containing ordered transactions to execute for cross-chain fulfillment */
         CrossChainFulfillmentResponse: {
@@ -4258,9 +4388,9 @@ export interface components {
              */
             address: string;
             /** @description Whether to include creator fees. Defaults to true. */
-            use_creator_fee?: boolean;
+            use_creator_fee?: boolean | null;
             /** @description Optional taker address for private listings */
-            taker?: string;
+            taker?: string | null;
         };
         /** @description An item to list for sale */
         ListingItem: {
@@ -4291,12 +4421,12 @@ export interface components {
              * @description Listing start time in ISO 8601 format. Defaults to now.
              * @example 2026-05-01T00:00:00Z
              */
-            start_time?: string;
+            start_time?: string | null;
             /**
              * @description Listing end time in ISO 8601 format. Defaults to 30 days from start.
              * @example 2026-06-01T00:00:00Z
              */
-            end_time?: string;
+            end_time?: string | null;
         };
         /** @description Response containing blockchain actions to execute for listing creation */
         CreateListingActionsResponse: {
@@ -4320,9 +4450,9 @@ export interface components {
             /** @description The drop's complete stage set, replacing any existing stages rather than merging with them. Exactly one stage must be `public_sale` and it must be first in this array. The presales that follow must be contiguous among themselves, each starting exactly when the previous presale ended, and the last must end exactly when the public stage starts. The first presale start time is not constrained. Array order is therefore not chronological: the public stage is listed first and runs last. */
             stages: components["schemas"]["SaveDropEditsStageRequest"][];
             /** @description Maximum supply for the drop as a decimal string */
-            max_supply?: string;
+            max_supply?: string | null;
             /** @description Creator payout address */
-            creator_payout_address?: string;
+            creator_payout_address?: string | null;
             /**
              * @description Set when saving a configuration the creator has not chosen a launch date for. Stage start and end times are still required, but they are held as a placeholder rather than a schedule: the whole stage set is shifted so the earliest stage opens at the Unix epoch, preserving each stage's duration and the gaps between them, and publishing the drop is refused until a launch date is set. Omit it to leave the drop scheduled; an explicit null is rejected.
              * @default false
@@ -4353,16 +4483,19 @@ export interface components {
             end_time: string;
             /** @description Stage price */
             price: components["schemas"]["SaveDropEditsPriceRequest"];
-            /** @description Maximum tokens mintable per wallet as a decimal string. Cumulative across stages rather than per stage, so this is a running total for the wallet. A wallet that has already reached a later stage's cap cannot mint on it. */
+            /** @description This stage's per-wallet limit as a decimal string: what the stage adds for each wallet on its list, unless that wallet's allowlist row sets its own. Not a running total: limits add up across the stages a wallet is listed on, the public stage adds its own on top, and unused mints carry into later stages. */
             max_total_mintable_by_wallet: string;
             /** @description Maximum token supply for this stage as a decimal string */
-            max_token_supply_for_stage?: string;
-            /** @description Stage label */
-            label?: string;
+            max_token_supply_for_stage?: string | null;
+            /**
+             * @description Stage name shown to minters, 1 to 100 characters. Required: a stage without one cannot be published.
+             * @example Public sale
+             */
+            label: string;
             /** @description Stage description */
-            description?: string;
+            description?: string | null;
             /** @description Allowlist file token */
-            allowlist_file_token?: string;
+            allowlist_file_token?: string | null;
         };
         /** @description Response body for saving a prereveal drop item */
         PrerevealDropItemResponse: {
@@ -4413,6 +4546,11 @@ export interface components {
              */
             quantity: number;
         };
+        /** @description Started upload of a drop's item media and metadata to IPFS */
+        DropMetadataUploadResponse: {
+            /** @description Opaque id of the upload. Pass it to GET /api/v2/drops/{slug}/metadata/ipfs/{workflow_execution_id} to follow progress. */
+            workflow_execution_id: string;
+        };
         /** @description Request to create a SelfMint drop item */
         SaveSelfMintDropItemRequest: {
             /** @description Media token reference */
@@ -4422,13 +4560,13 @@ export interface components {
             /** @description Item supply as a decimal string */
             supply: string;
             /** @description Item description */
-            description?: string;
+            description?: string | null;
             /** @description External URL */
-            external_url?: string;
+            external_url?: string | null;
             /** @description Animated media for the item, alongside its image. Blank is treated as no animation, the same as omitting the field. */
-            animation_url?: string;
+            animation_url?: string | null;
             /** @description Item traits */
-            traits?: components["schemas"]["SelfMintDropItemTraitRequest"][];
+            traits?: components["schemas"]["SelfMintDropItemTraitRequest"][] | null;
         };
         /** @description Request body for uploading drop item media */
         UploadDropItemMediaRequest: {
@@ -4547,8 +4685,8 @@ export interface components {
             description?: string;
             /** @description Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own. */
             image_url?: string;
-            /** @description Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. */
-            banner_image_url?: string;
+            /** @description Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived. */
+            banner_image_url?: string | null;
             owner?: string;
             safelist_status: string;
             category?: string;
@@ -4733,15 +4871,15 @@ export interface components {
         /** @description Request body for updating profile settings */
         UpdateProfileSettingsRequest: {
             /** @description Profile display name */
-            displayName?: string;
+            displayName?: string | null;
             /** @description Profile bio */
-            bio?: string;
+            bio?: string | null;
             /** @description Profile external URL */
-            externalUrl?: string;
+            externalUrl?: string | null;
             /** @description Profile image upload token */
-            profileImageToken?: string;
+            profileImageToken?: string | null;
             /** @description Banner image upload token */
-            bannerImageToken?: string;
+            bannerImageToken?: string | null;
         };
         /** @description Response for updating profile settings */
         UpdateProfileSettingsResponse: {
@@ -4765,21 +4903,21 @@ export interface components {
         ProfileShelfItemUpdateRequest: {
             item: components["schemas"]["ProfileShelfItemRequest"];
             /** @description Optional item description */
-            description?: string;
+            description?: string | null;
         };
         /** @description Request body for updating a profile shelf */
         UpdateProfileShelfRequest: {
             /** @description Shelf title */
-            title?: string;
+            title?: string | null;
             /** @description Shelf description */
-            description?: string;
+            description?: string | null;
             items?: components["schemas"]["ProfileShelfItemUpdateRequest"][];
             /** @description Shelf icon */
-            icon?: string;
+            icon?: string | null;
             /** @description Shelf view */
-            view?: string;
+            view?: string | null;
             /** @description Single-item shelf side */
-            single_item_shelf_side?: string;
+            single_item_shelf_side?: string | null;
         };
         /** @description Response body for a drop item attribute */
         DropItemAttributeResponse: {
@@ -4846,42 +4984,42 @@ export interface components {
         /** @description Request body for modifying collection metadata */
         ModifyCollectionRequest: {
             /** @description Collection name */
-            name?: string;
+            name?: string | null;
             /** @description Collection description */
-            description?: string;
+            description?: string | null;
             /** @description Logo image token */
-            logo_image_token?: string;
+            logo_image_token?: string | null;
             /** @description Banner image token */
-            banner_image_token?: string;
+            banner_image_token?: string | null;
             /** @description Collection category */
-            category?: string;
+            category?: string | null;
             /** @description New collection slug */
-            slug?: string;
+            slug?: string | null;
             /** @description Whether the collection is NSFW */
-            is_nsfw?: boolean;
+            is_nsfw?: boolean | null;
             /** @description Whether trait offers are enabled */
-            is_trait_offers_enabled?: boolean;
+            is_trait_offers_enabled?: boolean | null;
             /** @description Whether rarity is disabled */
-            is_rarity_disabled?: boolean;
+            is_rarity_disabled?: boolean | null;
             /** @description Authorized editors */
-            authorized_editors?: string[];
+            authorized_editors?: string[] | null;
             /** @description Collection external URL */
-            external_url?: string;
+            external_url?: string | null;
             /** @description Collection Telegram URL */
-            telegram_url?: string;
+            telegram_url?: string | null;
             /** @description Medium username */
-            medium_username?: string;
+            medium_username?: string | null;
             /** @description Creator fees */
-            creator_fees?: components["schemas"]["ModifyCollectionCreatorFeeRequest"][];
+            creator_fees?: components["schemas"]["ModifyCollectionCreatorFeeRequest"][] | null;
             /** @description Whether buyer-side creator fees are enabled */
-            buyer_side_creator_fee_enabled?: boolean;
+            buyer_side_creator_fee_enabled?: boolean | null;
             /**
              * Format: int32
              * @description Buyer-side creator fee basis points
              */
-            buyer_side_creator_fee_basis_points?: number;
+            buyer_side_creator_fee_basis_points?: number | null;
             /** @description Buyer-side creator fee recipient */
-            buyer_side_creator_fee_recipient?: string;
+            buyer_side_creator_fee_recipient?: string | null;
         };
         /** @description Response body for setting collection visibility */
         SetCollectionVisibilityResponse: {
@@ -4901,20 +5039,20 @@ export interface components {
         /** @description Collection about content */
         AboutMetadataRequest: {
             /** @description Preview media */
-            preview_media?: components["schemas"]["MediaInputRequest"][];
+            preview_media?: components["schemas"]["MediaInputRequest"][] | null;
             /** @description About sections */
-            sections?: components["schemas"]["AboutSectionRequest"][];
+            sections?: components["schemas"]["AboutSectionRequest"][] | null;
         };
         /** @description A section within collection about content */
         AboutSectionRequest: {
             /** @description Section ID */
-            id?: string;
+            id?: string | null;
             /** @description Section title */
             title: string;
             /** @description Section description */
             description: string;
             /** @description Section media */
-            media?: components["schemas"]["MediaInputRequest"][];
+            media?: components["schemas"]["MediaInputRequest"][] | null;
         };
         /** @description A content block overview module */
         ContentBlockModuleRequest: {
@@ -4924,34 +5062,34 @@ export interface components {
              */
             index: number;
             /** @description Module ID */
-            id?: string;
+            id?: string | null;
             /** @description Module title */
-            title?: string;
+            title?: string | null;
             /** @description Module description */
-            description?: string;
+            description?: string | null;
             /** @description Module sections */
-            sections?: components["schemas"]["ContentBlockSectionRequest"][];
+            sections?: components["schemas"]["ContentBlockSectionRequest"][] | null;
         };
         /** @description A content block section */
         ContentBlockSectionRequest: {
             /** @description Section ID */
-            id?: string;
+            id?: string | null;
             /** @description Section title */
-            title?: string;
+            title?: string | null;
             /** @description Section description */
-            description?: string;
+            description?: string | null;
             /** @description Section external link */
-            external_link?: components["schemas"]["LinkRequest"];
+            external_link?: components["schemas"]["LinkRequest"] | null;
             /** @description Section media */
-            media?: components["schemas"]["MediaInputRequest"];
+            media?: components["schemas"]["MediaInputRequest"] | null;
             /** @description Section module type */
             module_type: string;
             /** @description Section date */
-            date?: string;
+            date?: string | null;
             /** @description Collection slug */
-            collection_slug?: string;
+            collection_slug?: string | null;
             /** @description Token ID */
-            token_id?: string;
+            token_id?: string | null;
         };
         /** @description A FAQ overview module */
         FaqBlockModuleRequest: {
@@ -4961,18 +5099,18 @@ export interface components {
              */
             index: number;
             /** @description Whether the module is hidden */
-            hidden?: boolean;
+            hidden?: boolean | null;
             /** @description Module title */
-            title?: string;
+            title?: string | null;
             /** @description Module description */
-            description?: string;
+            description?: string | null;
             /** @description Module sections */
-            sections?: components["schemas"]["FaqSectionRequest"][];
+            sections?: components["schemas"]["FaqSectionRequest"][] | null;
         };
         /** @description A FAQ section */
         FaqSectionRequest: {
             /** @description Section ID */
-            id?: string;
+            id?: string | null;
             /** @description Question */
             question: string;
             /** @description Answer */
@@ -4981,9 +5119,9 @@ export interface components {
         /** @description Collection hero content */
         HeroMetadataRequest: {
             /** @description Desktop hero media */
-            desktop_hero_media?: components["schemas"]["MediaInputRequest"];
+            desktop_hero_media?: components["schemas"]["MediaInputRequest"] | null;
             /** @description Mobile hero media */
-            mobile_hero_media?: components["schemas"]["MediaInputRequest"];
+            mobile_hero_media?: components["schemas"]["MediaInputRequest"] | null;
         };
         /** @description An image media input */
         ImageMediaRequest: {
@@ -5000,14 +5138,14 @@ export interface components {
         /** @description A generic media input */
         MediaInputRequest: {
             /** @description Image media */
-            image?: components["schemas"]["ImageMediaRequest"];
+            image?: components["schemas"]["ImageMediaRequest"] | null;
             /** @description Video media */
-            video?: components["schemas"]["VideoMediaRequest"];
+            video?: components["schemas"]["VideoMediaRequest"] | null;
         };
         /** @description A narrative overview module */
         NarrativeModuleRequest: {
             /** @description Module ID */
-            id?: string;
+            id?: string | null;
             /**
              * Format: int32
              * @description Module index
@@ -5018,21 +5156,21 @@ export interface components {
             /** @description Module description */
             description: string;
             /** @description Module media */
-            media?: components["schemas"]["MediaInputRequest"][];
+            media?: components["schemas"]["MediaInputRequest"][] | null;
             /** @description Horizontal text position */
-            horizontal_text_position?: string;
+            horizontal_text_position?: string | null;
             /** @description Vertical text position */
-            vertical_text_position?: string;
+            vertical_text_position?: string | null;
             /** @description Desktop background media */
-            desktop_background_media?: components["schemas"]["MediaInputRequest"];
+            desktop_background_media?: components["schemas"]["MediaInputRequest"] | null;
             /** @description Mobile background media */
-            mobile_background_media?: components["schemas"]["MediaInputRequest"];
+            mobile_background_media?: components["schemas"]["MediaInputRequest"] | null;
             /** @description Module variant */
-            variant?: string;
+            variant?: string | null;
             /** @description Background image */
-            background_image?: components["schemas"]["ImageMediaRequest"];
+            background_image?: components["schemas"]["ImageMediaRequest"] | null;
             /** @description Background media */
-            background_media?: components["schemas"]["MediaInputRequest"];
+            background_media?: components["schemas"]["MediaInputRequest"] | null;
         };
         /** @description Collection overview content */
         OverviewMetadataRequest: {
@@ -5042,13 +5180,13 @@ export interface components {
         /** @description Overview modules */
         OverviewModuleRequest: {
             /** @description Narrative modules */
-            narrative?: components["schemas"]["NarrativeModuleRequest"][];
+            narrative?: components["schemas"]["NarrativeModuleRequest"][] | null;
             /** @description Content block modules */
-            content_block?: components["schemas"]["ContentBlockModuleRequest"][];
+            content_block?: components["schemas"]["ContentBlockModuleRequest"][] | null;
             /** @description Team modules */
-            team?: components["schemas"]["TeamBlockModuleRequest"][];
+            team?: components["schemas"]["TeamBlockModuleRequest"][] | null;
             /** @description FAQ modules */
-            faq?: components["schemas"]["FaqBlockModuleRequest"][];
+            faq?: components["schemas"]["FaqBlockModuleRequest"][] | null;
         };
         /** @description A team overview module */
         TeamBlockModuleRequest: {
@@ -5058,18 +5196,18 @@ export interface components {
              */
             index: number;
             /** @description Whether the module is hidden */
-            hidden?: boolean;
+            hidden?: boolean | null;
             /** @description Module title */
-            title?: string;
+            title?: string | null;
             /** @description Module description */
-            description?: string;
+            description?: string | null;
             /** @description Module sections */
-            sections?: components["schemas"]["TeamSectionRequest"][];
+            sections?: components["schemas"]["TeamSectionRequest"][] | null;
         };
         /** @description A team section */
         TeamSectionRequest: {
             /** @description Section ID */
-            id?: string;
+            id?: string | null;
             /** @description Section name */
             name: string;
             /** @description Section title */
@@ -5077,31 +5215,31 @@ export interface components {
             /** @description Section bio */
             bio: string;
             /** @description Website URL */
-            website_url?: string;
+            website_url?: string | null;
             /** @description Twitter URL */
-            twitter_url?: string;
+            twitter_url?: string | null;
             /** @description Instagram URL */
-            instagram_url?: string;
+            instagram_url?: string | null;
             /** @description Section media */
-            media?: components["schemas"]["MediaInputRequest"][];
+            media?: components["schemas"]["MediaInputRequest"][] | null;
         };
         /** @description Request body for updating collection metadata */
         UpdateCollectionMetadataRequest: {
             /** @description Collection about content */
-            about?: components["schemas"]["AboutMetadataRequest"];
+            about?: components["schemas"]["AboutMetadataRequest"] | null;
             /** @description Collection hero media */
-            hero?: components["schemas"]["HeroMetadataRequest"];
+            hero?: components["schemas"]["HeroMetadataRequest"] | null;
             /** @description Collection overview content */
-            overview?: components["schemas"]["OverviewMetadataRequest"];
+            overview?: components["schemas"]["OverviewMetadataRequest"] | null;
             /** @description Collection logo image token */
-            logo_image_token?: string;
+            logo_image_token?: string | null;
         };
         /** @description A video media input */
         VideoMediaRequest: {
             /** @description Video token */
             token: string;
             /** @description Enable static video */
-            enable_static_video?: boolean;
+            enable_static_video?: boolean | null;
         };
         /** @description Floor price for one trait value in one payment currency */
         TraitFloorResponse: {
@@ -5270,7 +5408,7 @@ export interface components {
             /** @description List of tokens */
             tokens: components["schemas"]["TokenResponse"][];
             /** @description Cursor for the next page of results */
-            next?: string;
+            next?: string | null;
         };
         /** @description A token with summary market data */
         TokenResponse: {
@@ -5295,7 +5433,7 @@ export interface components {
              */
             symbol: string;
             /** @description URL of the token's image */
-            image_url?: string;
+            image_url?: string | null;
             /**
              * @description Current price in USD
              * @example 1.0
@@ -5313,34 +5451,34 @@ export interface components {
              * Format: double
              * @description Market capitalization in USD
              */
-            market_cap_usd?: number;
+            market_cap_usd?: number | null;
             /**
              * Format: double
              * @description 24-hour trading volume in USD
              */
-            volume_24h?: number;
+            volume_24h?: number | null;
             /**
              * Format: double
              * @description Price change percentage over the last 24 hours
              */
-            price_change_24h?: number;
+            price_change_24h?: number | null;
             /**
              * Format: int64
              * @description Number of token holders
              */
-            holders_count?: number;
+            holders_count?: number | null;
             /** @description Whether OpenSea has verified the token */
             is_verified: boolean;
             /**
              * Format: double
              * @description When OpenSea first recorded the token
              */
-            created_at?: number;
+            created_at?: number | null;
             /**
              * Format: double
              * @description Earliest known onchain activity for the token
              */
-            genesis_date?: number;
+            genesis_date?: number | null;
         };
         /** @description A currency within a token group */
         TokenGroupCurrencyResponse: {
@@ -5365,7 +5503,7 @@ export interface components {
              */
             symbol: string;
             /** @description URL of the currency's image */
-            image_url?: string;
+            image_url?: string | null;
             /**
              * Format: int32
              * @description Number of decimal places
@@ -5383,7 +5521,7 @@ export interface components {
             /** @description List of token groups */
             token_groups: components["schemas"]["TokenGroupResponse"][];
             /** @description Cursor for the next page of results */
-            next?: string;
+            next?: string | null;
         };
         /** @description A token group representing equivalent currencies across different blockchains */
         TokenGroupResponse: {
@@ -5401,11 +5539,11 @@ export interface components {
              * @description Ticker symbol of the token group
              * @example ETH
              */
-            symbol?: string;
+            symbol?: string | null;
             /** @description Description of the token group */
-            description?: string;
+            description?: string | null;
             /** @description URL of the token group's image */
-            image_url?: string;
+            image_url?: string | null;
             /** @description URL to the token group page on OpenSea */
             opensea_url: string;
             /** @description Currencies in this token group */
@@ -5413,9 +5551,9 @@ export interface components {
             /** @description The primary currency for this token group */
             primary_currency: components["schemas"]["TokenGroupCurrencyResponse"];
             /** @description Market statistics for the token group */
-            stats?: components["schemas"]["TokenGroupStatsResponse"];
+            stats?: components["schemas"]["TokenGroupStatsResponse"] | null;
             /** @description Social media links for the token group */
-            socials?: components["schemas"]["TokenGroupSocialsResponse"];
+            socials?: components["schemas"]["TokenGroupSocialsResponse"] | null;
             /** @description ISO 8601 timestamp when the token group was created */
             created_at: string;
             /** @description ISO 8601 timestamp when the token group was last updated */
@@ -5424,41 +5562,41 @@ export interface components {
         /** @description Rolling statistics for a token group over multiple time periods */
         TokenGroupRollingStatsResponse: {
             /** @description 1-day trading volume in USD */
-            volume_1d?: string;
+            volume_1d?: string | null;
             /** @description 7-day trading volume in USD */
-            volume_7d?: string;
+            volume_7d?: string | null;
             /** @description 30-day trading volume in USD */
-            volume_30d?: string;
+            volume_30d?: string | null;
             /**
              * Format: double
              * @description 1-day price change percentage
              */
-            price_change_1d?: number;
+            price_change_1d?: number | null;
             /**
              * Format: double
              * @description 7-day price change percentage
              */
-            price_change_7d?: number;
+            price_change_7d?: number | null;
             /**
              * Format: double
              * @description 30-day price change percentage
              */
-            price_change_30d?: number;
+            price_change_30d?: number | null;
         };
         /** @description Social media links for a token group */
         TokenGroupSocialsResponse: {
             /** @description The token group's website URL */
-            website?: string;
+            website?: string | null;
             /** @description The token group's Twitter/X handle */
-            twitter?: string;
+            twitter?: string | null;
             /** @description The token group's Discord invite URL */
-            discord?: string;
+            discord?: string | null;
             /** @description The token group's Telegram identifier */
-            telegram?: string;
+            telegram?: string | null;
             /** @description CoinMarketCap listing URL */
-            coinmarketcap?: string;
+            coinmarketcap?: string | null;
             /** @description CoinGecko listing URL */
-            coingecko?: string;
+            coingecko?: string | null;
         };
         /** @description Market statistics for a token group */
         TokenGroupStatsResponse: {
@@ -5467,21 +5605,21 @@ export interface components {
             /** @description 24-hour trading volume in USD */
             volume_usd_24h: string;
             /** @description Current price in USD (from primary currency) */
-            price_usd?: string;
+            price_usd?: string | null;
             /**
              * Format: double
              * @description Price change percentage over the last 24 hours
              */
-            price_change_percent_24h?: number;
+            price_change_percent_24h?: number | null;
             /** @description Total supply across all currencies in the group */
-            total_supply?: string;
+            total_supply?: string | null;
             /**
              * Format: int32
              * @description Number of holders
              */
-            holders?: number;
+            holders?: number | null;
             /** @description Rolling statistics over multiple time periods */
-            rolling_stats?: components["schemas"]["TokenGroupRollingStatsResponse"];
+            rolling_stats?: components["schemas"]["TokenGroupRollingStatsResponse"] | null;
         };
         /** @description Swap quote with price details and executable transactions */
         SwapQuoteResponse: {
@@ -5495,9 +5633,9 @@ export interface components {
             /** @description Primary wallet address of the account */
             address: string;
             /** @description Username of the account */
-            username?: string;
+            username?: string | null;
             /** @description URL of the account's profile image */
-            profile_image_url?: string;
+            profile_image_url?: string | null;
             /** @description URL to the account on OpenSea */
             opensea_url: string;
         };
@@ -5522,6 +5660,29 @@ export interface components {
             /** @description URL to the collection on OpenSea */
             opensea_url: string;
         };
+        /** @description Cheapest listing for one unit of an NFT search result that can be filled through this API */
+        NftSearchBestListingResponse: {
+            /**
+             * @description Price for one unit, in whole units of the payment currency
+             * @example 0.25
+             */
+            price: string;
+            /**
+             * @description Symbol of the payment currency. Null when the currency could not be resolved.
+             * @example ETH
+             */
+            currency?: string | null;
+            /**
+             * @description Contract address of the payment currency
+             * @example 0x0000000000000000000000000000000000000000
+             */
+            currency_address: string;
+            /**
+             * @description Price for one unit in USD. Null when the currency has no USD price.
+             * @example 812.5
+             */
+            price_usd?: string | null;
+        };
         /** @description NFT search result */
         NftSearchResponse: {
             /**
@@ -5542,6 +5703,8 @@ export interface components {
             image_url?: string;
             /** @description URL to the NFT on OpenSea */
             opensea_url: string;
+            /** @description Cheapest listing for one unit of this NFT that can be filled through this API (OpenSea listings; other marketplaces are excluded). Null when there is none. */
+            best_listing?: components["schemas"]["NftSearchBestListingResponse"] | null;
         };
         /** @description Search results response */
         SearchResponse: {
@@ -5587,7 +5750,7 @@ export interface components {
              */
             symbol: string;
             /** @description URL of the token's image */
-            image_url?: string;
+            image_url?: string | null;
             /**
              * @description Current price in USD
              * @example 1.0
@@ -5606,7 +5769,7 @@ export interface components {
         SavedToolsPaginatedResponse: {
             tools: components["schemas"]["SavedToolResponse"][];
             /** @description Cursor for the next page, or null when this is the last page */
-            next?: string;
+            next?: string | null;
         };
         GetOrderResponse: {
             order: components["schemas"]["Listing"] | components["schemas"]["Offer"];
@@ -5712,7 +5875,7 @@ export interface components {
             /** @description List of drops */
             drops: components["schemas"]["DropResponse"][];
             /** @description Cursor for the next page. May be present even when drops is empty if all items in the page were filtered by visibility rules; continue paginating until next is null. */
-            next?: string;
+            next?: string | null;
         };
         /** @description Summary of an NFT drop */
         DropResponse: {
@@ -5745,9 +5908,9 @@ export interface components {
             /** @description OpenSea URL for the drop */
             opensea_url: string;
             /** @description The currently-minting stage, if the drop is live. Null if not minting. */
-            active_stage?: components["schemas"]["DropStageResponse"];
+            active_stage?: components["schemas"]["DropStageResponse"] | null;
             /** @description The earliest upcoming stage by start_time when the drop is not currently minting (e.g. before it starts or between stages). Null if the drop is live or has no future stages. */
-            next_stage?: components["schemas"]["DropStageResponse"];
+            next_stage?: components["schemas"]["DropStageResponse"] | null;
         };
         /** @description A mint stage within a drop */
         DropStageResponse: {
@@ -5768,14 +5931,14 @@ export interface components {
             start_time: string;
             /** @description Stage end time (ISO 8601) */
             end_time: string;
-            /** @description Ceiling on the wallet's mints for the whole drop, not this stage alone. Cumulative: SeaDrop checks it against the wallet's lifetime minted count on the contract, so caps on different stages do not add together. Matches max_total_mintable_by_wallet on the eligibility response. */
+            /** @description This stage's default per-wallet limit, as a decimal string: what the stage adds for each wallet on its list, unless that wallet's allowlist row sets its own. Limits add up across the stages a wallet is listed on, the public stage adds its own on top, and unused mints carry into later stages. For one wallet's running total through a stage, read max_total_mintable_by_wallet on the eligibility response. */
             max_per_wallet: string;
             /**
              * Format: int32
              * @description Wallets on this stage's allowlist when the drop service last synced it. Null when the stage has no synced allowlist, which includes every public sale stage; that is distinct from 0, which means the allowlist is empty. Equivalent to allowlistMemberCount on the GraphQL DropStage.
              * @example 1200
              */
-            allowlist_wallet_count?: number;
+            allowlist_wallet_count?: number | null;
         };
         /** @description Detailed drop information including stages and supply */
         DropDetailedResponse: {
@@ -5808,15 +5971,36 @@ export interface components {
             /** @description OpenSea URL for the drop */
             opensea_url: string;
             /** @description The currently-minting stage, if the drop is live. Null if not minting. */
-            active_stage?: components["schemas"]["DropStageResponse"];
+            active_stage?: components["schemas"]["DropStageResponse"] | null;
             /** @description The earliest upcoming stage by start_time when the drop is not currently minting (e.g. before it starts or between stages). Null if the drop is live or has no future stages. */
-            next_stage?: components["schemas"]["DropStageResponse"];
+            next_stage?: components["schemas"]["DropStageResponse"] | null;
             /** @description Drop stages (public sale, presale, etc.) */
             stages: components["schemas"]["DropStageResponse"][];
             /** @description Total minted supply */
             total_supply?: string;
             /** @description Maximum supply */
             max_supply?: string;
+        };
+        /** @description Progress of a drop's IPFS metadata upload */
+        DropMetadataUploadProgressResponse: {
+            /**
+             * @description running, completed, failed, or not_found. Keep polling while running. On completed the draft holds the new base URI; publish again to put it onchain.
+             * @example running
+             * @enum {string}
+             */
+            status: "running" | "completed" | "failed" | "not_found";
+            /**
+             * Format: double
+             * @description Media upload progress, 0 to 100
+             */
+            media_upload_progress?: number | null;
+            /**
+             * Format: double
+             * @description Metadata upload progress, 0 to 100
+             */
+            metadata_upload_progress?: number | null;
+            /** @description Why the upload failed, when status is failed */
+            failure_reason?: string | null;
         };
         /** @description Drop eligibility results for the authenticated wallet */
         DropEligibilityResponse: {
@@ -5833,11 +6017,11 @@ export interface components {
             /** @description Whether the wallet is eligible for this stage */
             is_eligible: boolean;
             /** @description Mint price per token in wei (decimal string) */
-            price?: string;
-            /** @description Ceiling on the wallet's mints for the whole drop, all token ids included, as a decimal string. Cumulative rather than per stage: SeaDrop checks it against the wallet's lifetime minted count on the contract, so caps on different stages do not add together, and a wallet that has already reached a later stage's cap cannot mint on it. */
-            max_total_mintable_by_wallet?: string;
-            /** @description The same ceiling for a single token id (ERC-1155), as a decimal string. Also a lifetime total for that token id rather than a per-stage allowance. */
-            max_total_mintable_by_wallet_per_token?: string;
+            price?: string | null;
+            /** @description The wallet's running cap through this stage, all token ids included, as a decimal string: the limits of every stage up to and including this one that the wallet is listed on, added together, clamped to supply. The public stage's own limit is added only on the public stage's result, not on any presale's. SeaDrop checks the cap against the wallet's lifetime minted count on the contract, so subtract what the wallet has minted to get what it can still mint. */
+            max_total_mintable_by_wallet?: string | null;
+            /** @description The same running cap for a single token id (ERC-1155), as a decimal string: the per-token limits of every stage up to and including this one that the wallet is listed on, added together, clamped to supply. As with the whole-drop cap, the public stage's own per-token limit is added only on the public stage's result. */
+            max_total_mintable_by_wallet_per_token?: string | null;
         };
         /** @description Deploy contract receipt status */
         DropDeployReceiptResponse: {
@@ -5847,11 +6031,11 @@ export interface components {
              */
             status: string;
             /** @description Deployed contract address (only present on success) */
-            contract_address?: string;
+            contract_address?: string | null;
             /** @description Chain slug (only present on success) */
-            chain?: string;
+            chain?: string | null;
             /** @description Linked collection slug (only present on success, may take time to materialize) */
-            collection_slug?: string;
+            collection_slug?: string | null;
         };
         CollectionPaginatedResponse: {
             collections: components["schemas"]["CollectionResponse"][];
@@ -5863,8 +6047,8 @@ export interface components {
             description?: string;
             /** @description Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own. */
             image_url?: string;
-            /** @description Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. */
-            banner_image_url?: string;
+            /** @description Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived. */
+            banner_image_url?: string | null;
             owner?: string;
             safelist_status: string;
             category?: string;
@@ -6009,7 +6193,7 @@ export interface components {
             /** @description List of offer aggregates */
             offer_aggregates: components["schemas"]["CollectionOfferAggregateResponse"][];
             /** @description Cursor for the next page of results */
-            next?: string;
+            next?: string | null;
         };
         /** @description Price information for an offer aggregate */
         OfferAggregatePriceResponse: {
@@ -6021,7 +6205,7 @@ export interface components {
              */
             token_unit: number;
             /** @description Payment token symbol */
-            symbol?: string;
+            symbol?: string | null;
             /** @description Blockchain chain */
             chain: string;
         };
@@ -6042,7 +6226,7 @@ export interface components {
             /** @description List of holders */
             holders: components["schemas"]["CollectionHolderResponse"][];
             /** @description Cursor for the next page of results */
-            next?: string;
+            next?: string | null;
         };
         /** @description Floor price history for a collection */
         FloorPriceHistoryResponse: {
@@ -6057,16 +6241,16 @@ export interface components {
              */
             time: number;
             /** @description Floor price in USD */
-            usd_price?: string;
+            usd_price?: string | null;
             /**
              * Format: double
              * @description Floor price in token units
              */
-            token_unit?: number;
+            token_unit?: number | null;
             /** @description Payment token symbol */
-            symbol?: string;
+            symbol?: string | null;
             /** @description Blockchain chain */
-            chain?: string;
+            chain?: string | null;
         };
         NftListResponse: {
             nfts: components["schemas"]["Nft"][];
@@ -6155,31 +6339,31 @@ export interface components {
             /** @description Unique identifier for the pool */
             pool_identifier: string;
             /** @description On-chain address of the pool contract */
-            pool_address?: string;
+            pool_address?: string | null;
             /** @description Base token contract identifier (chain/address) */
             base_token: string;
             /** @description Quote token contract identifier (chain/address) */
             quote_token: string;
             /** @description USD value of base token reserves */
-            base_reserve_usd?: number;
+            base_reserve_usd?: number | null;
             /** @description USD value of quote token reserves */
-            quote_reserve_usd?: number;
+            quote_reserve_usd?: number | null;
             /** @description Total USD value of reserves in the pool */
-            total_reserve_usd?: number;
+            total_reserve_usd?: number | null;
             /**
              * Format: float
              * @description Bonding curve progress percentage (0-100)
              */
-            bonding_curve_progress?: number;
+            bonding_curve_progress?: number | null;
             /** @description Whether the token has graduated from its bonding curve */
-            is_graduated?: boolean;
+            is_graduated?: boolean | null;
         };
         /** @description Paginated list of liquidity pools for a token */
         TokenLiquidityPoolsResponse: {
             /** @description List of liquidity pools */
             pools: components["schemas"]["TokenLiquidityPoolResponse"][];
             /** @description Cursor for the next page of results */
-            next?: string;
+            next?: string | null;
         };
         /** @description Holder distribution health metrics for a token */
         TokenHolderDistributionResponse: {
@@ -6212,13 +6396,13 @@ export interface components {
              * Format: float
              * @description Percentage of total supply held by this address
              */
-            percentage_held?: number;
+            percentage_held?: number | null;
             /** @description USD value of the holding */
-            usd_value?: number;
+            usd_value?: number | null;
             /** @description Wallet address of the holder */
             owner_address: string;
             /** @description Display name of the holder */
-            owner_display_name?: string;
+            owner_display_name?: string | null;
         };
         /** @description Paginated list of token holders */
         TokenHoldersResponse: {
@@ -6228,11 +6412,11 @@ export interface components {
              * Format: int32
              * @description Total number of holders
              */
-            total_count?: number;
+            total_count?: number | null;
             /** @description Holder distribution health metrics */
-            distribution?: components["schemas"]["TokenHolderDistributionResponse"];
+            distribution?: components["schemas"]["TokenHolderDistributionResponse"] | null;
             /** @description Cursor for the next page of results */
-            next?: string;
+            next?: string | null;
         };
         /** @description Token amount with contract and value information */
         TokenAmountResponse: {
@@ -6258,7 +6442,7 @@ export interface components {
             /** @description List of swap activity events */
             swap_events: components["schemas"]["TokenSwapActivityResponse"][];
             /** @description Cursor for the next page of results */
-            next?: string;
+            next?: string | null;
         };
         /** @description A token swap activity event */
         TokenSwapActivityResponse: {
@@ -6278,9 +6462,9 @@ export interface components {
             /** @description Transaction hash */
             transaction_hash: string;
             /** @description User operation hash (for account abstraction) */
-            user_op_hash?: string;
+            user_op_hash?: string | null;
             /** @description Swap protocol used */
-            swap_protocol?: string;
+            swap_protocol?: string | null;
             /** @description Blockchain the swap occurred on */
             chain: string;
         };
@@ -6297,7 +6481,7 @@ export interface components {
              * Format: date-time
              * @description End time of the oldest returned aggregation window, or null when no window is returned
              */
-            computed_at?: string;
+            computed_at?: string | null;
             /** @description Trading activity keyed by requested window. A requested key is omitted when the token has no swaps in that window; an omitted key means zero trades. */
             windows: {
                 [key: string]: components["schemas"]["TokenActivityWindowStatsResponse"];
@@ -6325,13 +6509,13 @@ export interface components {
              * @description Distinct wallets that bought this token during the window. Only populated for the 1h and 24h windows; always null for 5m and 4h, which have no materialized source. Null also means the value is unavailable or not yet authoritative for this token, which remains a valid runtime state. Zero is an authoritative zero, so do not treat null as 0.
              * @example 412
              */
-            unique_buyer_count?: number;
+            unique_buyer_count?: number | null;
             /**
              * Format: int64
              * @description Distinct wallets that sold this token during the window. Only populated for the 1h and 24h windows; always null for 5m and 4h, which have no materialized source. Null also means the value is unavailable or not yet authoritative for this token, which remains a valid runtime state. Zero is an authoritative zero, so do not treat null as 0.
              * @example 377
              */
-            unique_seller_count?: number;
+            unique_seller_count?: number | null;
         };
         ContractResponse: {
             address: string;
@@ -6369,7 +6553,7 @@ export interface components {
              */
             token_unit: number;
             /** @description Payment token symbol */
-            symbol?: string;
+            symbol?: string | null;
             /** @description Blockchain chain */
             chain: string;
         };
@@ -6421,7 +6605,7 @@ export interface components {
         /** @description Public agent ownership relationships for a profile */
         AgentProfileRelationshipsResponse: {
             /** @description The account confirmed to own this one as its agent. Null when there is none, which is ordinary rather than exceptional: an agent nobody declared is a valid agent account. Only a relationship both accounts confirmed appears here. */
-            agent_owner?: components["schemas"]["AgentProfileSummaryResponse"];
+            agent_owner?: components["schemas"]["AgentProfileSummaryResponse"] | null;
             /** @description The accounts this one is the confirmed owner of, newest relationship first. Empty when there are none. */
             agents: components["schemas"]["AgentProfileSummaryResponse"][];
         };
@@ -6441,12 +6625,12 @@ export interface components {
              */
             address: string;
             /** @description OpenSea username, if available */
-            username?: string;
+            username?: string | null;
             /**
              * @description Primary ENS name, if available
              * @example vitalik.eth
              */
-            ens_name?: string;
+            ens_name?: string | null;
         };
         AgentRelationshipListResponse: {
             relationships: components["schemas"]["AgentRelationshipResponse"][];
@@ -6456,7 +6640,7 @@ export interface components {
             /** @description List of token balances */
             token_balances: components["schemas"]["TokenBalanceResponse"][];
             /** @description Cursor for the next page of results */
-            next?: string;
+            next?: string | null;
         };
         /** @description Token balance for a wallet address */
         TokenBalanceResponse: {
@@ -6481,7 +6665,7 @@ export interface components {
              */
             symbol: string;
             /** @description URL of the token's image */
-            image_url?: string;
+            image_url?: string | null;
             /**
              * @description Current price in USD
              * @example 1.0
@@ -6515,19 +6699,19 @@ export interface components {
              * @description USD value of base token reserves in the top liquidity pool paired with a curated quote token
              * @example 125000.5
              */
-            base_token_liquidity_usd?: string;
+            base_token_liquidity_usd?: string | null;
             /**
              * @description USD value of quote token reserves in the top liquidity pool paired with a curated quote token
              * @example 125000.5
              */
-            quote_token_liquidity_usd?: string;
+            quote_token_liquidity_usd?: string | null;
         };
         /** @description Paginated list of account token activity events */
         TokenAccountActivityPaginatedResponse: {
             /** @description List of token activity events */
             activities: components["schemas"]["TokenAccountActivityResponse"][];
             /** @description Cursor for the next page of results */
-            next?: string;
+            next?: string | null;
         };
         /** @description A fungible token activity event for an account */
         TokenAccountActivityResponse: {
@@ -6541,19 +6725,19 @@ export interface components {
             /** @description Address that initiated the activity */
             from: string;
             /** @description Recipient address for transfers */
-            to?: string;
+            to?: string | null;
             /** @description Token amount for transfers */
-            token?: components["schemas"]["TokenAmountResponse"];
+            token?: components["schemas"]["TokenAmountResponse"] | null;
             /** @description Token sold/swapped from */
-            from_token?: components["schemas"]["TokenAmountResponse"];
+            from_token?: components["schemas"]["TokenAmountResponse"] | null;
             /** @description Token received/swapped to */
-            to_token?: components["schemas"]["TokenAmountResponse"];
+            to_token?: components["schemas"]["TokenAmountResponse"] | null;
             /** @description Swap protocol used */
-            swap_protocol?: string;
+            swap_protocol?: string | null;
             /** @description Transaction hash */
             transaction_hash: string;
             /** @description User operation hash (for account abstraction) */
-            user_op_hash?: string;
+            user_op_hash?: string | null;
             /**
              * Format: double
              * @description Timestamp of the activity
@@ -6581,12 +6765,12 @@ export interface components {
              * @description Absolute P&L in USD over the timeframe
              * @example +1250.00
              */
-            pnl_absolute?: string;
+            pnl_absolute?: string | null;
             /**
              * @description Percentage P&L over the timeframe
              * @example +1.01
              */
-            pnl_percentage?: string;
+            pnl_percentage?: string | null;
             /**
              * @description The queried timeframe
              * @example WEEK
@@ -6676,12 +6860,12 @@ export interface components {
              * @description Token price in USD at the time of the transfer, or null if unknown.
              * @example 0.0425
              */
-            price_usd?: string;
+            price_usd?: string | null;
             /**
              * @description USD value of the transfer, or null if unknown.
              * @example 63.75
              */
-            value_usd?: string;
+            value_usd?: string | null;
             /**
              * @description Transaction hash/signature of the transfer.
              * @example 0xabc123
@@ -6692,12 +6876,12 @@ export interface components {
              * @description Block time of the transfer, or null if unknown.
              * @example 1777334400
              */
-            block_time?: number;
+            block_time?: number | null;
             /**
              * @description Type of transfer, used to distinguish zero-cost acquisitions (e.g. AIRDROP, CEX_TRANSFER) from buys/sells (e.g. SWAP_BUY, SWAP_SELL). Null if unclassified.
              * @example SWAP_BUY
              */
-            transfer_type?: string;
+            transfer_type?: string | null;
         };
         /** @description A page of token transfers contributing to a wallet's position in a currency */
         PositionTokenTransfersResponse: {
@@ -6710,12 +6894,12 @@ export interface components {
              */
             total_count: number;
             /** @description Cursor for the next page of results, or null if there are no more pages */
-            next?: string;
+            next?: string | null;
         };
         /** @description A single realized (closed) trading position. Realized P&L and cost basis are computed via FIFO (first-in, first-out) lot matching. */
         ClosedPositionResponse: {
             /** @description The currency that was traded. Null if the currency is no longer surfaced (e.g. under trust & safety enforcement). */
-            currency?: components["schemas"]["TokenBaseResponse"];
+            currency?: components["schemas"]["TokenBaseResponse"] | null;
             /**
              * @description Realized profit or loss in USD for this position (FIFO). Signed.
              * @example +1840.25
@@ -6746,7 +6930,7 @@ export interface components {
              * @description When the position was closed (last sell). Null if unknown.
              * @example 1777334400
              */
-            closed_at?: number;
+            closed_at?: number | null;
             /** @description Whether this was a round-trip OpenSea trade (bought and sold on OpenSea). */
             is_opensea_trade: boolean;
             /**
@@ -6754,7 +6938,7 @@ export interface components {
              * @description When the tokens in this position were first acquired. Null if unknown.
              * @example 1768435200
              */
-            first_acquired_at?: number;
+            first_acquired_at?: number | null;
         };
         /** @description A page of a wallet's closed (realized) trading positions */
         ClosedPositionsResponse: {
@@ -6767,7 +6951,7 @@ export interface components {
              */
             total_count: number;
             /** @description Cursor for the next page of results, or null if there are no more pages */
-            next?: string;
+            next?: string | null;
         };
         /** @description Common perpetual future identity fields shared across perpetual responses */
         PerpetualFutureBaseResponse: {
@@ -6778,14 +6962,14 @@ export interface components {
             /** @description The perpetual future symbol */
             symbol: string;
             /** @description URL of the perpetual future image */
-            image_url?: string;
+            image_url?: string | null;
             /** @description Description of the perpetual future */
-            description?: string;
+            description?: string | null;
             /**
              * Format: double
              * @description Created timestamp
              */
-            created_at?: number;
+            created_at?: number | null;
             /** @description Chain identifier */
             chain: string;
             /** @description Contract address */
@@ -6810,14 +6994,14 @@ export interface components {
             /** @description Categories */
             categories: string[];
             /** @description Market */
-            market?: string;
+            market?: string | null;
         };
         /** @description Paginated list of perpetual futures */
         PerpetualFuturePaginatedResponse: {
             /** @description List of perpetual futures */
             perpetuals: components["schemas"]["PerpetualFutureResponse"][];
             /** @description Cursor for the next page of results */
-            next?: string;
+            next?: string | null;
         };
         /** @description A perpetual future */
         PerpetualFutureResponse: {
@@ -6828,14 +7012,14 @@ export interface components {
             /** @description The perpetual future symbol */
             symbol: string;
             /** @description URL of the perpetual future image */
-            image_url?: string;
+            image_url?: string | null;
             /** @description Description of the perpetual future */
-            description?: string;
+            description?: string | null;
             /**
              * Format: double
              * @description Created timestamp
              */
-            created_at?: number;
+            created_at?: number | null;
             /** @description Chain identifier */
             chain: string;
             /** @description Contract address */
@@ -6860,29 +7044,29 @@ export interface components {
             /** @description Categories */
             categories: string[];
             /** @description Market */
-            market?: string;
+            market?: string | null;
             /** @description Market statistics */
-            stats?: components["schemas"]["PerpetualFutureStatsResponse"];
+            stats?: components["schemas"]["PerpetualFutureStatsResponse"] | null;
         };
         /** @description Market statistics for a perpetual future */
         PerpetualFutureStatsResponse: {
             /** @description Price in USD */
-            price_usd?: number;
+            price_usd?: number | null;
             /**
              * Format: float
              * @description 24-hour price change percentage
              */
-            price_change_24h?: number;
+            price_change_24h?: number | null;
             /** @description 24-hour volume in USD */
-            volume_24h?: number;
+            volume_24h?: number | null;
             /** @description Mark price */
-            mark_price?: number;
+            mark_price?: number | null;
             /** @description Oracle price */
-            oracle_price?: number;
+            oracle_price?: number | null;
             /** @description Funding rate */
-            funding_rate?: number;
+            funding_rate?: number | null;
             /** @description Open interest */
-            open_interest?: number;
+            open_interest?: number | null;
         };
         ProfileCollectionResponse: {
             collection: string;
@@ -6890,8 +7074,8 @@ export interface components {
             description?: string;
             /** @description Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own. */
             image_url?: string;
-            /** @description Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. */
-            banner_image_url?: string;
+            /** @description Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived. */
+            banner_image_url?: string | null;
             owner?: string;
             safelist_status: string;
             category?: string;
@@ -6991,7 +7175,9 @@ export interface components {
             headers: {
                 [name: string]: unknown;
             };
-            content?: never;
+            content: {
+                "*/*": components["schemas"]["V1ErrorWrapper"];
+            };
         };
         /** @description Invalid or missing API key */
         Unauthorized: {
@@ -7005,21 +7191,27 @@ export interface components {
             headers: {
                 [name: string]: unknown;
             };
-            content?: never;
+            content: {
+                "*/*": components["schemas"]["V1ErrorWrapper"];
+            };
         };
         /** @description Resource not found */
         NotFound: {
             headers: {
                 [name: string]: unknown;
             };
-            content?: never;
+            content: {
+                "*/*": components["schemas"]["V1ErrorWrapper"];
+            };
         };
         /** @description Resource conflict */
         Conflict: {
             headers: {
                 [name: string]: unknown;
             };
-            content?: never;
+            content: {
+                "*/*": components["schemas"]["V1ErrorWrapper"];
+            };
         };
         /** @description Rate limit exceeded */
         RateLimit: {
@@ -8263,6 +8455,68 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    build_drop_unpublish_transaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example cool-cats
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ready-to-sign unpublish transaction */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DropTransactionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    build_drop_publish_transaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example cool-cats
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ready-to-sign publish transaction */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DropTransactionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     save_prereveal_drop_item: {
         parameters: {
             query?: never;
@@ -8370,6 +8624,37 @@ export interface operations {
                     "*/*": components["schemas"]["V1ErrorWrapper"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    upload_drop_metadata_to_ipfs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example cool-cats
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Upload started, or the upload already running for this drop */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DropMetadataUploadResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -8514,6 +8799,37 @@ export interface operations {
                     "*/*": components["schemas"]["SaveDropItemMediaResponse"];
                 };
             };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    upload_drop_collection_manifest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example cool-cats
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Upload context generated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UploadContext"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
@@ -9339,6 +9655,8 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -10450,6 +10768,39 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    get_drop_metadata_ipfs_progress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example cool-cats
+                 */
+                slug: string;
+                /** @description The workflow_execution_id returned when the upload was started */
+                workflow_execution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Upload progress */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DropMetadataUploadProgressResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

@@ -1921,7 +1921,7 @@
       "post": {
         "tags": ["Drops Endpoints"],
         "summary": "Update Creator Studio drop edits",
-        "description": "Update an existing ERC-721 SeaDrop V1 drop and its stages.\n\nSaves a Creator Studio draft. It does not change the live drop: SeaDrop stages are onchain contract state, so the draft has to be published separately before buyers see it. A 200 here means the draft was accepted, not that the drop changed.\n\n`stages` replaces the whole set rather than merging, so send every stage the drop should end up with, including ones you are not changing. Reuse an existing stage uuid to update it, supply a new UUID to add one, and omit a stage to delete it.\n\nThe stage list has four rules, and rules 2 and 4 interact in a way worth reading before the first attempt:\n\n1. Exactly one stage must be `public_sale`.\n2. That public stage must be first in the array.\n3. The presales, meaning every stage after the first, must be contiguous among themselves: each one starts exactly when the previous presale ended. The first presale start time is not constrained.\n4. The last presale must end exactly when the public stage starts.\n\nTogether, 2 and 4 mean array order is not chronological order: the public stage is listed first and runs last, with the presales running in array order before it. A drop with two allowlist stages therefore sends `[public, presale1, presale2]` while time runs presale1, then presale2, then public. Rule 3 does not tie presale1 back to the public stage, which is why the chain reads forward from presale1 rather than from the array head.\n\nPer-wallet mint limits are cumulative across stages, so `max_total_mintable_by_wallet` on a later stage is a running total for the wallet rather than a fresh allowance.",
+        "description": "Update an existing ERC-721 SeaDrop V1 drop and its stages.\n\nSaves a Creator Studio draft. It does not change the live drop: SeaDrop stages are onchain contract state, so the draft has to be published separately before buyers see it. A 200 here means the draft was accepted, not that the drop changed.\n\n`stages` replaces the whole set rather than merging, so send every stage the drop should end up with, including ones you are not changing. Reuse an existing stage uuid to update it, supply a new UUID to add one, and omit a stage to delete it.\n\nThe stage list has four rules, and rules 2 and 4 interact in a way worth reading before the first attempt:\n\n1. Exactly one stage must be `public_sale`.\n2. That public stage must be first in the array.\n3. The presales, meaning every stage after the first, must be contiguous among themselves: each one starts exactly when the previous presale ended. The first presale start time is not constrained.\n4. The last presale must end exactly when the public stage starts.\n\nTogether, 2 and 4 mean array order is not chronological order: the public stage is listed first and runs last, with the presales running in array order before it. A drop with two allowlist stages therefore sends `[public, presale1, presale2]` while time runs presale1, then presale2, then public. Rule 3 does not tie presale1 back to the public stage, which is why the chain reads forward from presale1 rather than from the array head.\n\nEach stage's `max_total_mintable_by_wallet` is what that stage adds for a wallet, not a running total. Limits add up across the stages a wallet is listed on, the public stage adds its own limit on top, and mints a wallet leaves unused carry into later stages. So presales of 2 and 1 plus a public limit of 1 let a wallet on both lists mint 4.",
         "operationId": "save_drop_edits",
         "parameters": [
           {
@@ -1971,6 +1971,116 @@
                 }
               }
             }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": [],
+            "WalletAuth": ["write:drops"]
+          }
+        ],
+        "x-opensea-auth-required": true,
+        "x-opensea-auth-scopes": ["write:drops"]
+      }
+    },
+    "/api/v2/drops/{slug}/unpublish": {
+      "post": {
+        "tags": ["Drops Endpoints"],
+        "summary": "Build unpublish transaction data for a drop",
+        "description": "Returns a ready-to-sign transaction that closes a live ERC-721 SeaDrop V1 drop by replacing its stages with one that has already ended. Only the collection owner can call this endpoint, and the transaction must be sent from `from`.\n\nThis saves that ended stage as the drop's draft before returning, replacing any edits saved with POST /api/v2/drops/{slug}. If the transaction is never sent, save new edits before publishing again.",
+        "operationId": "build_drop_unpublish_transaction",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Collection slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "cool-cats"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ready-to-sign unpublish transaction",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DropTransactionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": [],
+            "WalletAuth": ["write:drops"]
+          }
+        ],
+        "x-opensea-auth-required": true,
+        "x-opensea-auth-scopes": ["write:drops"]
+      }
+    },
+    "/api/v2/drops/{slug}/publish": {
+      "post": {
+        "tags": ["Drops Endpoints"],
+        "summary": "Build publish transaction data for a drop",
+        "description": "Returns a ready-to-sign transaction that applies the drop's saved edits onchain: stages, supply, base URI, payout, and the OpenSea signer, fee recipient, and payers the drop needs. Every value is computed by OpenSea; do not build or change this calldata yourself, or signed presales stop validating.\n\nSend the transaction from `from`, the contract's onchain owner. Only the collection owner can call this endpoint.\n\nA 400 carries the reason the drop cannot be published, for example that it is disabled, its launch date is still pending, or it has no saved edits to apply. After a first publish, the drop is live once GET /api/v2/drops/{slug} returns it, which happens after the transaction is mined and indexed.\n\nTo reveal, run POST /api/v2/drops/{slug}/metadata/ipfs, wait for it to complete, then call this endpoint again to put the new base URI onchain.",
+        "operationId": "build_drop_publish_transaction",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Collection slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "cool-cats"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ready-to-sign publish transaction",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DropTransactionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -2144,6 +2254,61 @@
             "$ref": "#/components/responses/InternalError"
           }
         }
+      }
+    },
+    "/api/v2/drops/{slug}/metadata/ipfs": {
+      "post": {
+        "tags": ["Drops Endpoints"],
+        "summary": "Upload drop metadata to IPFS",
+        "description": "Uploads every saved item's media and metadata to IPFS, then saves the resulting folder as the drop's draft base URI. Run it after POST /api/v2/drops/{slug}/items/media/save; the drop needs at least one item. It does not change the contract: call POST /api/v2/drops/{slug}/publish once it completes.\n\nOnly one upload runs per drop at a time. Calling again while one is running returns that upload's id. Poll GET /api/v2/drops/{slug}/metadata/ipfs/{workflow_execution_id} until status is completed or failed.",
+        "operationId": "upload_drop_metadata_to_ipfs",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Collection slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "cool-cats"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upload started, or the upload already running for this drop",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DropMetadataUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": [],
+            "WalletAuth": ["write:drops"]
+          }
+        ],
+        "x-opensea-auth-required": true,
+        "x-opensea-auth-scopes": ["write:drops"]
       }
     },
     "/api/v2/drops/{slug}/items": {
@@ -2382,6 +2547,61 @@
         "x-opensea-auth-scopes": ["write:drops"]
       }
     },
+    "/api/v2/drops/{slug}/items/manifest": {
+      "post": {
+        "tags": ["Drops Endpoints"],
+        "summary": "Upload drop metadata manifest",
+        "description": "The file is a CSV describing every item in the drop, one row per uploaded media file. Required columns are tokenID, name, description, and file_name, where file_name matches the filename passed to POST /api/v2/drops/{slug}/items/media. Optional columns are external_url, animation_url, and one attributes[<trait type>] column per trait. Upload it in two steps. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Unlike other upload contexts, the returned token is not passed to any later call: the file is stored against the drop, and the next POST /api/v2/drops/{slug}/items/media/save reads it. Send one media token per row there, because the save keeps only the files the manifest names. Without a manifest, items get token ids 1 to n in upload order, named #1 to #n, with no description or traits.",
+        "operationId": "upload_drop_collection_manifest",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Collection slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "cool-cats"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upload context generated successfully",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadContext"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": [],
+            "WalletAuth": ["write:drops"]
+          }
+        ],
+        "x-opensea-auth-required": true,
+        "x-opensea-auth-scopes": ["write:drops"]
+      }
+    },
     "/api/v2/drops/{slug}/cross_chain_mint": {
       "post": {
         "tags": ["Drops Endpoints"],
@@ -2471,7 +2691,7 @@
       "post": {
         "tags": ["Drops Endpoints"],
         "summary": "Upload drop allowlist",
-        "description": "The file is CSV with a header row, and the wallet column must be named address or walletaddress. Optional per-row columns are a custom mint limit and a custom price. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Pass the token as allowlist_file_token to POST /api/v2/drops/{slug}/allowlist/validate, which returns a different token. That second token is the one a stage takes: send it as allowlist_file_token on the stage in POST /api/v2/drops/{slug}, or the uploaded file is never attached to anything. The presigned upload expires about a minute after it is issued, so request the context and upload in one go rather than requesting it ahead of time.",
+        "description": "The file is CSV with a header row, and the wallet column must be named address or walletaddress. Optional per-row columns are a custom mint limit and a custom price. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Send the token as allowlist_file_token on the stage in POST /api/v2/drops/{slug}; saving the edits validates the file and rejects them if it is invalid. POST /api/v2/drops/{slug}/allowlist/validate runs the same check without saving and returns the same token. The allowlist is enforced once the drop is published with POST /api/v2/drops/{slug}/publish. The presigned upload expires about a minute after it is issued, so request the context and upload in one go rather than requesting it ahead of time.",
         "operationId": "upload_drop_allowlist",
         "parameters": [
           {
@@ -3626,7 +3846,7 @@
       "patch": {
         "tags": ["Collection Endpoints"],
         "summary": "Set collection visibility",
-        "description": "Hide or unhide a collection.",
+        "description": "Hide or unhide a collection. Only the collection owner can change visibility. A collection whose minted tokens are held by more than one wallet cannot be hidden; the request fails with 400 and says so.",
         "operationId": "set_collection_visibility",
         "parameters": [
           {
@@ -3666,6 +3886,12 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -5977,6 +6203,70 @@
             "$ref": "#/components/responses/InternalError"
           }
         }
+      }
+    },
+    "/api/v2/drops/{slug}/metadata/ipfs/{workflow_execution_id}": {
+      "get": {
+        "tags": ["Drops Endpoints"],
+        "summary": "Get drop IPFS metadata upload progress",
+        "description": "Progress of an upload started by POST /api/v2/drops/{slug}/metadata/ipfs. Poll every 15 seconds or slower while status is running.",
+        "operationId": "get_drop_metadata_ipfs_progress",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Collection slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "cool-cats"
+          },
+          {
+            "name": "workflow_execution_id",
+            "in": "path",
+            "description": "The workflow_execution_id returned when the upload was started",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upload progress",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DropMetadataUploadProgressResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": [],
+            "WalletAuth": ["write:drops"]
+          }
+        ],
+        "x-opensea-auth-required": true,
+        "x-opensea-auth-scopes": ["write:drops"]
       }
     },
     "/api/v2/drops/{slug}/eligibility": {
@@ -9351,6 +9641,33 @@
         ],
         "example": "ethereum"
       },
+      "DropTransactionResponse": {
+        "type": "object",
+        "description": "Ready-to-sign drop transaction",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "Transaction target contract address"
+          },
+          "from": {
+            "type": "string",
+            "description": "Address the transaction must be sent from: the contract's onchain owner. Sent from any other address it reverts."
+          },
+          "data": {
+            "type": "string",
+            "description": "Encoded transaction data (hex)"
+          },
+          "value": {
+            "type": "string",
+            "description": "Transaction value in wei"
+          },
+          "chain": {
+            "type": "string",
+            "description": "Chain identifier"
+          }
+        },
+        "required": ["chain", "data", "from", "to", "value"]
+      },
       "SelfMintDropItemResponse": {
         "type": "object",
         "description": "Ready-to-sign SelfMint drop item transaction data",
@@ -9359,20 +9676,29 @@
             "type": "string",
             "description": "Transaction target contract address"
           },
+          "from": {
+            "type": "string",
+            "description": "Address the transaction must be sent from: the contract's onchain owner. Sent from any other address it reverts."
+          },
           "data": {
             "type": "string",
             "description": "Encoded transaction data (hex)"
           },
           "value": {
             "type": "string",
-            "description": "Transaction value in wei (hex)"
+            "description": "Transaction value in wei"
           },
           "chain": {
             "type": "string",
             "description": "Chain identifier"
+          },
+          "token_id": {
+            "type": "string",
+            "description": "Token id of the item. On a create it is the id OpenSea assigned; the item mints under it once the transaction is mined.",
+            "example": "1"
           }
         },
-        "required": ["chain", "data", "to", "value"]
+        "required": ["chain", "data", "from", "to", "token_id", "value"]
       },
       "V1ErrorWrapper": {
         "type": "object",
@@ -9419,25 +9745,25 @@
             "minLength": 0
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Item description",
             "maxLength": 2000,
             "minLength": 0
           },
           "external_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "External URL",
             "maxLength": 1000,
             "minLength": 0
           },
           "animation_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Animated media for the item, alongside its image. Omit to leave the stored value alone; send an empty string to remove it.",
             "maxLength": 1000,
             "minLength": 0
           },
           "traits": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Item traits",
             "items": {
               "$ref": "#/components/schemas/SelfMintDropItemTraitRequest"
@@ -9482,24 +9808,24 @@
             "enum": ["ITEM", "TOKEN", "COLLECTION", "PERPETUAL"]
           },
           "chain": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Blockchain chain slug",
             "example": "ethereum"
           },
           "contract_address": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Contract address"
           },
           "token_id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Token ID"
           },
           "slug": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection slug"
           },
           "id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Perpetual ID"
           }
         },
@@ -9531,7 +9857,7 @@
             "example": "0x0000000000000000000000000000000000000000"
           },
           "token_id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Token ID for NFTs",
             "example": "1234"
           },
@@ -9557,7 +9883,7 @@
             "minItems": 0
           },
           "to_assets": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Assets being received",
             "items": {
               "$ref": "#/components/schemas/AssetQuantityInput"
@@ -9583,7 +9909,7 @@
             "example": "ethereum"
           },
           "swap_provider": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The swap provider used (e.g. RELAY, JUPITER, ZERO_EX, LOCAL_BUY_NFT). Required when relay_request_id is not provided. Can be omitted for cross-chain flows that use relay_request_id.",
             "example": "RELAY"
           }
@@ -9595,7 +9921,7 @@
         "description": "Request to get a transaction receipt/status",
         "properties": {
           "transaction_identifiers": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Transaction identifiers to look up",
             "items": {
               "$ref": "#/components/schemas/TransactionIdentifierInput"
@@ -9608,11 +9934,11 @@
             "description": "The swap quote that was originally submitted"
           },
           "relay_request_id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Relay request ID for cross-chain tracking"
           },
           "request_id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Request ID for workflow tracking"
           }
         },
@@ -9633,7 +9959,7 @@
             "example": "0xBd3531dA5CF5857e7CfAA92426877b022e612cf8"
           },
           "token_id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Token ID for NFTs",
             "example": "1234"
           }
@@ -9670,7 +9996,7 @@
             "example": "5.5"
           },
           "currency": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Token symbol",
             "example": "ETH"
           },
@@ -9706,7 +10032,7 @@
             "example": "SUCCESS"
           },
           "fail_reason": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Reason for failure, if applicable"
           },
           "asset_receipts": {
@@ -9735,7 +10061,7 @@
             }
           },
           "cross_chain_refunded": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Whether a cross-chain refund was issued"
           }
         },
@@ -9898,7 +10224,7 @@
             "example": "USDC"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the token's image"
           },
           "usd_price": {
@@ -9964,7 +10290,7 @@
             "example": "USDC"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the token's image"
           },
           "usd_price": {
@@ -9983,36 +10309,50 @@
             "description": "URL to the token page on OpenSea"
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "A description of the token"
           },
           "description_source": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Source of the description. `TOKEN_METADATA` is supplied by token metadata; `AI_GENERATED` is OpenSea's generated token-page description.",
-            "enum": ["TOKEN_METADATA", "AI_GENERATED"]
+            "enum": ["TOKEN_METADATA", "AI_GENERATED", null]
           },
           "description_generated_at": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "When an AI-generated description was generated"
           },
           "description_sources": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Sources used for an AI-generated description",
             "items": {
               "type": "string"
             }
           },
           "stats": {
-            "$ref": "#/components/schemas/TokenStatsResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenStatsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Market statistics for the token"
           },
           "socials": {
-            "$ref": "#/components/schemas/TokenSocialsResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenSocialsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Social media links for the token"
           },
           "holders_count": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64",
             "description": "Number of token holders"
           },
@@ -10021,12 +10361,12 @@
             "description": "Whether OpenSea has verified the token"
           },
           "created_at": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "When OpenSea first recorded the token"
           },
           "genesis_date": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Earliest known onchain activity for the token"
           },
@@ -10053,23 +10393,23 @@
         "description": "Social media links for a token",
         "properties": {
           "website": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The token's website URL"
           },
           "subreddit_identifier": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The token's subreddit identifier"
           },
           "twitter_handle": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The token's Twitter/X handle"
           },
           "telegram_identifier": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The token's Telegram identifier"
           },
           "twitter_follower_count": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64",
             "description": "Twitter/X follower count"
           }
@@ -10080,52 +10420,52 @@
         "description": "Market statistics for a token",
         "properties": {
           "market_cap_usd": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Market capitalization in USD"
           },
           "fdv_usd": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Fully diluted valuation in USD"
           },
           "circulating_supply": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Circulating supply of the token"
           },
           "max_supply": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Maximum supply of the token"
           },
           "total_supply": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Total supply of the token"
           },
           "volume_24h": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "24-hour trading volume in USD"
           },
           "price_change_1h": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Price change percentage over the last hour"
           },
           "price_change_24h": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Price change percentage over the last 24 hours"
           },
           "price_change_7d": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Price change percentage over the last 7 days"
           },
           "price_change_30d": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Price change percentage over the last 30 days"
           }
@@ -10177,11 +10517,11 @@
             "example": "0x1234567890abcdef1234567890abcdef12345678"
           },
           "recipient": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Recipient address (defaults to sender address)"
           },
           "slippage_tolerance": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Slippage tolerance as a decimal (0.0 to 0.5, default: 0.01)",
             "example": 0.01
@@ -10226,7 +10566,7 @@
             }
           },
           "data": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Hex-encoded instruction payload, optionally 0x-prefixed",
             "example": "01020304"
           }
@@ -10238,23 +10578,23 @@
         "description": "Compute budget a v1 Solana message carries inline instead of as instructions",
         "properties": {
           "priority_fee_lamports": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Total priority fee in lamports, as a decimal string",
             "example": "5000"
           },
           "compute_unit_limit": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32",
             "description": "Compute unit limit",
             "example": 200000
           },
           "loaded_accounts_data_size_limit": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32",
             "description": "Loaded accounts data size limit in bytes"
           },
           "heap_size_bytes": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32",
             "description": "Requested heap frame size in bytes"
           }
@@ -10283,7 +10623,14 @@
             }
           },
           "transaction_config": {
-            "$ref": "#/components/schemas/SvmTransactionConfigResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SvmTransactionConfigResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Present only when the transaction may be compiled as a v1 message. A v1 compiler drops the ComputeBudget instructions from `instructions` and places these values in the message header; legacy/v0 compilers ignore this field"
           }
         },
@@ -10392,16 +10739,23 @@
             "example": 50
           },
           "price_impact": {
-            "$ref": "#/components/schemas/SwapPriceImpact",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SwapPriceImpact"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Price impact of the swap (null if unavailable)"
           },
           "swap_provider": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The swap provider that fulfilled this quote (null if unavailable)",
             "example": "RELAY"
           },
           "recommended_slippage": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Recommended slippage tolerance based on volatility analysis (null if unavailable)",
             "example": 2
@@ -10453,7 +10807,7 @@
             "example": "ethereum"
           },
           "to": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The destination address for the transaction"
           },
           "data": {
@@ -10461,19 +10815,26 @@
             "description": "The transaction data. For EVM chains: hex-encoded calldata. For SVM chains: comma-separated instructions in programId:data format."
           },
           "value": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The native token value to send with the transaction (decimal)"
           },
           "value_hex": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The native token value to send with the transaction (hex, 0x-prefixed)"
           },
           "svm": {
-            "$ref": "#/components/schemas/SvmTransactionDetailsResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SvmTransactionDetailsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Structured Solana transaction contents. Set for SVM chains only; `data` is a lossy summary of the same instructions."
           },
           "gas_limit": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Gas limit for the transaction, in gas units. Already includes a safety buffer over the estimate — use it as-is (or take the max of this and your own buffered estimate) and do not shrink it. Null when no reliable estimate is available."
           }
         },
@@ -10502,7 +10863,7 @@
             "minLength": 1
           },
           "toolkit_name": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Saved-tools toolkit name",
             "example": "All",
             "maxLength": 255,
@@ -10645,7 +11006,7 @@
             "minLength": 1
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Shelf description",
             "maxLength": 500,
             "minLength": 0
@@ -10659,15 +11020,15 @@
             "minItems": 1
           },
           "icon": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Shelf icon"
           },
           "view": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Shelf view"
           },
           "single_item_shelf_side": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Single-item shelf side"
           }
         },
@@ -11526,12 +11887,12 @@
             "$ref": "#/components/schemas/ConsiderationObject"
           },
           "units_to_fill": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64",
             "description": "Optional quantity of units to fulfill; defaults to 1 for offers"
           },
           "include_optional_creator_fees": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "default": false,
             "description": "Whether to include optional creator fees in the fulfillment. If creator fees are already required, this is a no-op. Defaults to false."
           }
@@ -12173,7 +12534,7 @@
             ]
           },
           "calldata_suffix": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "4-byte hex attribution suffix (e.g. 0xcdb44011) to append to the ABI-encoded calldata before submitting the transaction onchain. Appending this suffix attributes the fill to OpenSea; omitting it does not affect execution."
           }
         },
@@ -12303,7 +12664,7 @@
             "description": "The criteria to pass through to the POST /api/v2/offers submit step. Includes collection and trait information so trait offers are not accidentally submitted as collection offers."
           },
           "encodedTokenIds": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Encoded token IDs that can be used to fulfill the criteria offer. When identifierOrCriteria is '0', this field is informational only and not required for order construction."
           }
         },
@@ -12406,17 +12767,17 @@
             "description": "Price per item"
           },
           "start_time": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Offer start time in ISO 8601 format. Defaults to now.",
             "example": "2026-05-01T00:00:00Z"
           },
           "end_time": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Offer end time in ISO 8601 format. Defaults to 30 days from start.",
             "example": "2026-06-01T00:00:00Z"
           },
           "use_creator_fee": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Whether to include optional creator fees. Defaults to false."
           }
         },
@@ -12829,7 +13190,7 @@
             "example": "0x..."
           },
           "recipient": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Optional recipient address for the purchased items"
           }
         },
@@ -12853,7 +13214,7 @@
             }
           },
           "errors": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Errors encountered during sweep. Present alongside steps for partial success cases (e.g. some listings became unavailable).",
             "items": {
               "$ref": "#/components/schemas/SweepError"
@@ -12889,12 +13250,12 @@
             "type": "string"
           },
           "units_to_fill": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64",
             "description": "Optional quantity of units to fulfill; defaults to remaining units for listings"
           },
           "include_optional_creator_fees": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "default": false,
             "description": "Whether to include optional creator fees in the fulfillment. If creator fees are already required, this is a no-op. Defaults to false."
           }
@@ -12935,7 +13296,7 @@
             "description": "The token to pay with"
           },
           "recipient": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Optional recipient address for the purchased items"
           }
         },
@@ -12972,11 +13333,11 @@
             "example": "0x..."
           },
           "use_creator_fee": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Whether to include creator fees. Defaults to true."
           },
           "taker": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Optional taker address for private listings"
           }
         },
@@ -13012,12 +13373,12 @@
             "description": "Price per item"
           },
           "start_time": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Listing start time in ISO 8601 format. Defaults to now.",
             "example": "2026-05-01T00:00:00Z"
           },
           "end_time": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Listing end time in ISO 8601 format. Defaults to 30 days from start.",
             "example": "2026-06-01T00:00:00Z"
           }
@@ -13078,11 +13439,11 @@
             "minItems": 1
           },
           "max_supply": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Maximum supply for the drop as a decimal string"
           },
           "creator_payout_address": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Creator payout address"
           },
           "launch_date_pending": {
@@ -13125,27 +13486,29 @@
           },
           "max_total_mintable_by_wallet": {
             "type": "string",
-            "description": "Maximum tokens mintable per wallet as a decimal string. Cumulative across stages rather than per stage, so this is a running total for the wallet. A wallet that has already reached a later stage's cap cannot mint on it."
+            "description": "This stage's per-wallet limit as a decimal string: what the stage adds for each wallet on its list, unless that wallet's allowlist row sets its own. Not a running total: limits add up across the stages a wallet is listed on, the public stage adds its own on top, and unused mints carry into later stages."
           },
           "max_token_supply_for_stage": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Maximum token supply for this stage as a decimal string"
           },
           "label": {
             "type": "string",
-            "description": "Stage label"
+            "description": "Stage name shown to minters, 1 to 100 characters. Required: a stage without one cannot be published.",
+            "example": "Public sale"
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Stage description"
           },
           "allowlist_file_token": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Allowlist file token"
           }
         },
         "required": [
           "end_time",
+          "label",
           "max_total_mintable_by_wallet",
           "price",
           "stage_type",
@@ -13250,6 +13613,17 @@
         },
         "required": ["minter", "quantity"]
       },
+      "DropMetadataUploadResponse": {
+        "type": "object",
+        "description": "Started upload of a drop's item media and metadata to IPFS",
+        "properties": {
+          "workflow_execution_id": {
+            "type": "string",
+            "description": "Opaque id of the upload. Pass it to GET /api/v2/drops/{slug}/metadata/ipfs/{workflow_execution_id} to follow progress."
+          }
+        },
+        "required": ["workflow_execution_id"]
+      },
       "SaveSelfMintDropItemRequest": {
         "type": "object",
         "description": "Request to create a SelfMint drop item",
@@ -13271,25 +13645,25 @@
             "minLength": 1
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Item description",
             "maxLength": 2000,
             "minLength": 0
           },
           "external_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "External URL",
             "maxLength": 1000,
             "minLength": 0
           },
           "animation_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Animated media for the item, alongside its image. Blank is treated as no animation, the same as omitting the field.",
             "maxLength": 1000,
             "minLength": 0
           },
           "traits": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Item traits",
             "items": {
               "$ref": "#/components/schemas/SelfMintDropItemTraitRequest"
@@ -13532,8 +13906,8 @@
             "description": "Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own."
           },
           "banner_image_url": {
-            "type": "string",
-            "description": "Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one."
+            "type": ["string", "null"],
+            "description": "Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived."
           },
           "owner": {
             "type": "string"
@@ -13951,29 +14325,29 @@
         "description": "Request body for updating profile settings",
         "properties": {
           "displayName": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Profile display name",
             "maxLength": 50,
             "minLength": 0
           },
           "bio": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Profile bio",
             "maxLength": 500,
             "minLength": 0
           },
           "externalUrl": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Profile external URL",
             "maxLength": 2048,
             "minLength": 0
           },
           "profileImageToken": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Profile image upload token"
           },
           "bannerImageToken": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Banner image upload token"
           }
         }
@@ -14030,7 +14404,7 @@
             "$ref": "#/components/schemas/ProfileShelfItemRequest"
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Optional item description",
             "maxLength": 500,
             "minLength": 0
@@ -14043,13 +14417,13 @@
         "description": "Request body for updating a profile shelf",
         "properties": {
           "title": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Shelf title",
             "maxLength": 100,
             "minLength": 1
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Shelf description",
             "maxLength": 500,
             "minLength": 0
@@ -14063,15 +14437,15 @@
             "minItems": 1
           },
           "icon": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Shelf icon"
           },
           "view": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Shelf view"
           },
           "single_item_shelf_side": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Single-item shelf side"
           }
         }
@@ -14226,51 +14600,51 @@
         "description": "Request body for modifying collection metadata",
         "properties": {
           "name": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection name",
             "maxLength": 100,
             "minLength": 1,
             "pattern": "^[\\x20-\\x7E]+$"
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection description",
             "maxLength": 1000,
             "minLength": 0
           },
           "logo_image_token": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Logo image token"
           },
           "banner_image_token": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Banner image token"
           },
           "category": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection category"
           },
           "slug": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "New collection slug",
             "maxLength": 50,
             "minLength": 1,
             "pattern": "^[a-z0-9-]+$"
           },
           "is_nsfw": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Whether the collection is NSFW"
           },
           "is_trait_offers_enabled": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Whether trait offers are enabled"
           },
           "is_rarity_disabled": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Whether rarity is disabled"
           },
           "authorized_editors": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Authorized editors",
             "items": {
               "type": "string"
@@ -14279,24 +14653,24 @@
             "minItems": 0
           },
           "external_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection external URL",
             "pattern": "^$|^(https?)://.+$"
           },
           "telegram_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection Telegram URL",
             "pattern": "^$|^(https?)://.+$"
           },
           "medium_username": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Medium username",
             "maxLength": 50,
             "minLength": 1,
             "pattern": "^[a-zA-Z0-9_-]+$"
           },
           "creator_fees": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Creator fees",
             "items": {
               "$ref": "#/components/schemas/ModifyCollectionCreatorFeeRequest"
@@ -14305,18 +14679,18 @@
             "minItems": 0
           },
           "buyer_side_creator_fee_enabled": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Whether buyer-side creator fees are enabled"
           },
           "buyer_side_creator_fee_basis_points": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32",
             "description": "Buyer-side creator fee basis points",
             "maximum": 1000,
             "minimum": 0
           },
           "buyer_side_creator_fee_recipient": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Buyer-side creator fee recipient"
           }
         }
@@ -14359,7 +14733,7 @@
         "description": "Collection about content",
         "properties": {
           "preview_media": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Preview media",
             "items": {
               "$ref": "#/components/schemas/MediaInputRequest"
@@ -14368,7 +14742,7 @@
             "minItems": 0
           },
           "sections": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "About sections",
             "items": {
               "$ref": "#/components/schemas/AboutSectionRequest"
@@ -14383,7 +14757,7 @@
         "description": "A section within collection about content",
         "properties": {
           "id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Section ID"
           },
           "title": {
@@ -14399,7 +14773,7 @@
             "minLength": 1
           },
           "media": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Section media",
             "items": {
               "$ref": "#/components/schemas/MediaInputRequest"
@@ -14418,23 +14792,23 @@
             "description": "Module index"
           },
           "id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Module ID"
           },
           "title": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Module title",
             "maxLength": 100,
             "minLength": 0
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Module description",
             "maxLength": 1000,
             "minLength": 0
           },
           "sections": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Module sections",
             "items": {
               "$ref": "#/components/schemas/ContentBlockSectionRequest"
@@ -14448,27 +14822,41 @@
         "description": "A content block section",
         "properties": {
           "id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Section ID"
           },
           "title": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Section title",
             "maxLength": 100,
             "minLength": 0
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Section description",
             "maxLength": 1000,
             "minLength": 0
           },
           "external_link": {
-            "$ref": "#/components/schemas/LinkRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LinkRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Section external link"
           },
           "media": {
-            "$ref": "#/components/schemas/MediaInputRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaInputRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Section media"
           },
           "module_type": {
@@ -14477,15 +14865,15 @@
             "minLength": 1
           },
           "date": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Section date"
           },
           "collection_slug": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection slug"
           },
           "token_id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Token ID"
           }
         },
@@ -14501,23 +14889,23 @@
             "description": "Module index"
           },
           "hidden": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Whether the module is hidden"
           },
           "title": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Module title",
             "maxLength": 100,
             "minLength": 0
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Module description",
             "maxLength": 1000,
             "minLength": 0
           },
           "sections": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Module sections",
             "items": {
               "$ref": "#/components/schemas/FaqSectionRequest"
@@ -14531,7 +14919,7 @@
         "description": "A FAQ section",
         "properties": {
           "id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Section ID"
           },
           "question": {
@@ -14554,11 +14942,25 @@
         "description": "Collection hero content",
         "properties": {
           "desktop_hero_media": {
-            "$ref": "#/components/schemas/MediaInputRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaInputRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Desktop hero media"
           },
           "mobile_hero_media": {
-            "$ref": "#/components/schemas/MediaInputRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaInputRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Mobile hero media"
           }
         }
@@ -14599,11 +15001,25 @@
         "description": "A generic media input",
         "properties": {
           "image": {
-            "$ref": "#/components/schemas/ImageMediaRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageMediaRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Image media"
           },
           "video": {
-            "$ref": "#/components/schemas/VideoMediaRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoMediaRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Video media"
           }
         }
@@ -14613,7 +15029,7 @@
         "description": "A narrative overview module",
         "properties": {
           "id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Module ID"
           },
           "index": {
@@ -14634,41 +15050,69 @@
             "minLength": 0
           },
           "media": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Module media",
             "items": {
               "$ref": "#/components/schemas/MediaInputRequest"
             }
           },
           "horizontal_text_position": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Horizontal text position",
             "pattern": "(?i)^(left|center|right)$"
           },
           "vertical_text_position": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Vertical text position",
             "pattern": "(?i)^(top|center|bottom)$"
           },
           "desktop_background_media": {
-            "$ref": "#/components/schemas/MediaInputRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaInputRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Desktop background media"
           },
           "mobile_background_media": {
-            "$ref": "#/components/schemas/MediaInputRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaInputRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Mobile background media"
           },
           "variant": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Module variant",
             "pattern": "(?i)^(text|background|text_and_background|text_and_media)$"
           },
           "background_image": {
-            "$ref": "#/components/schemas/ImageMediaRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageMediaRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Background image"
           },
           "background_media": {
-            "$ref": "#/components/schemas/MediaInputRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaInputRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Background media"
           }
         },
@@ -14690,7 +15134,7 @@
         "description": "Overview modules",
         "properties": {
           "narrative": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Narrative modules",
             "items": {
               "$ref": "#/components/schemas/NarrativeModuleRequest"
@@ -14699,7 +15143,7 @@
             "minItems": 0
           },
           "content_block": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Content block modules",
             "items": {
               "$ref": "#/components/schemas/ContentBlockModuleRequest"
@@ -14708,7 +15152,7 @@
             "minItems": 0
           },
           "team": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Team modules",
             "items": {
               "$ref": "#/components/schemas/TeamBlockModuleRequest"
@@ -14717,7 +15161,7 @@
             "minItems": 0
           },
           "faq": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "FAQ modules",
             "items": {
               "$ref": "#/components/schemas/FaqBlockModuleRequest"
@@ -14737,23 +15181,23 @@
             "description": "Module index"
           },
           "hidden": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Whether the module is hidden"
           },
           "title": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Module title",
             "maxLength": 100,
             "minLength": 0
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Module description",
             "maxLength": 1000,
             "minLength": 0
           },
           "sections": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Module sections",
             "items": {
               "$ref": "#/components/schemas/TeamSectionRequest"
@@ -14767,7 +15211,7 @@
         "description": "A team section",
         "properties": {
           "id": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Section ID"
           },
           "name": {
@@ -14789,22 +15233,22 @@
             "minLength": 0
           },
           "website_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Website URL",
             "pattern": "^$|^(https?)://.+$"
           },
           "twitter_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Twitter URL",
             "pattern": "^$|^(https?)://.+$"
           },
           "instagram_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Instagram URL",
             "pattern": "^$|^(https?)://.+$"
           },
           "media": {
-            "type": "array",
+            "type": ["array", "null"],
             "description": "Section media",
             "items": {
               "$ref": "#/components/schemas/MediaInputRequest"
@@ -14818,19 +15262,40 @@
         "description": "Request body for updating collection metadata",
         "properties": {
           "about": {
-            "$ref": "#/components/schemas/AboutMetadataRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AboutMetadataRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Collection about content"
           },
           "hero": {
-            "$ref": "#/components/schemas/HeroMetadataRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HeroMetadataRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Collection hero media"
           },
           "overview": {
-            "$ref": "#/components/schemas/OverviewMetadataRequest",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OverviewMetadataRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Collection overview content"
           },
           "logo_image_token": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Collection logo image token"
           }
         }
@@ -14845,7 +15310,7 @@
             "minLength": 1
           },
           "enable_static_video": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Enable static video"
           }
         },
@@ -15400,7 +15865,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results"
           }
         },
@@ -15431,7 +15896,7 @@
             "example": "USDC"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the token's image"
           },
           "usd_price": {
@@ -15450,22 +15915,22 @@
             "description": "URL to the token page on OpenSea"
           },
           "market_cap_usd": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Market capitalization in USD"
           },
           "volume_24h": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "24-hour trading volume in USD"
           },
           "price_change_24h": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Price change percentage over the last 24 hours"
           },
           "holders_count": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64",
             "description": "Number of token holders"
           },
@@ -15474,12 +15939,12 @@
             "description": "Whether OpenSea has verified the token"
           },
           "created_at": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "When OpenSea first recorded the token"
           },
           "genesis_date": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Earliest known onchain activity for the token"
           }
@@ -15520,7 +15985,7 @@
             "example": "WETH"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the currency's image"
           },
           "decimals": {
@@ -15556,7 +16021,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results"
           }
         },
@@ -15577,16 +16042,16 @@
             "example": "Ethereum"
           },
           "symbol": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Ticker symbol of the token group",
             "example": "ETH"
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Description of the token group"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the token group's image"
           },
           "opensea_url": {
@@ -15605,11 +16070,25 @@
             "description": "The primary currency for this token group"
           },
           "stats": {
-            "$ref": "#/components/schemas/TokenGroupStatsResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenGroupStatsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Market statistics for the token group"
           },
           "socials": {
-            "$ref": "#/components/schemas/TokenGroupSocialsResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenGroupSocialsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Social media links for the token group"
           },
           "created_at": {
@@ -15636,29 +16115,29 @@
         "description": "Rolling statistics for a token group over multiple time periods",
         "properties": {
           "volume_1d": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "1-day trading volume in USD"
           },
           "volume_7d": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "7-day trading volume in USD"
           },
           "volume_30d": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "30-day trading volume in USD"
           },
           "price_change_1d": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "1-day price change percentage"
           },
           "price_change_7d": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "7-day price change percentage"
           },
           "price_change_30d": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "30-day price change percentage"
           }
@@ -15669,27 +16148,27 @@
         "description": "Social media links for a token group",
         "properties": {
           "website": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The token group's website URL"
           },
           "twitter": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The token group's Twitter/X handle"
           },
           "discord": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The token group's Discord invite URL"
           },
           "telegram": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "The token group's Telegram identifier"
           },
           "coinmarketcap": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "CoinMarketCap listing URL"
           },
           "coingecko": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "CoinGecko listing URL"
           }
         }
@@ -15707,25 +16186,32 @@
             "description": "24-hour trading volume in USD"
           },
           "price_usd": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Current price in USD (from primary currency)"
           },
           "price_change_percent_24h": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Price change percentage over the last 24 hours"
           },
           "total_supply": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Total supply across all currencies in the group"
           },
           "holders": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32",
             "description": "Number of holders"
           },
           "rolling_stats": {
-            "$ref": "#/components/schemas/TokenGroupRollingStatsResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenGroupRollingStatsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Rolling statistics over multiple time periods"
           }
         },
@@ -15758,11 +16244,11 @@
             "description": "Primary wallet address of the account"
           },
           "username": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Username of the account"
           },
           "profile_image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the account's profile image"
           },
           "opensea_url": {
@@ -15811,6 +16297,33 @@
           "opensea_url"
         ]
       },
+      "NftSearchBestListingResponse": {
+        "type": "object",
+        "description": "Cheapest listing for one unit of an NFT search result that can be filled through this API",
+        "properties": {
+          "price": {
+            "type": "string",
+            "description": "Price for one unit, in whole units of the payment currency",
+            "example": "0.25"
+          },
+          "currency": {
+            "type": ["string", "null"],
+            "description": "Symbol of the payment currency. Null when the currency could not be resolved.",
+            "example": "ETH"
+          },
+          "currency_address": {
+            "type": "string",
+            "description": "Contract address of the payment currency",
+            "example": "0x0000000000000000000000000000000000000000"
+          },
+          "price_usd": {
+            "type": ["string", "null"],
+            "description": "Price for one unit in USD. Null when the currency has no USD price.",
+            "example": "812.5"
+          }
+        },
+        "required": ["currency_address", "price"]
+      },
       "NftSearchResponse": {
         "type": "object",
         "description": "NFT search result",
@@ -15840,6 +16353,17 @@
           "opensea_url": {
             "type": "string",
             "description": "URL to the NFT on OpenSea"
+          },
+          "best_listing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NftSearchBestListingResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cheapest listing for one unit of this NFT that can be filled through this API (OpenSea listings; other marketplaces are excluded). Null when there is none."
           }
         },
         "required": ["collection", "contract", "identifier", "opensea_url"]
@@ -15911,7 +16435,7 @@
             "example": "USDC"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the token's image"
           },
           "usd_price": {
@@ -15951,7 +16475,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page, or null when this is the last page"
           }
         },
@@ -16312,7 +16836,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page. May be present even when drops is empty if all items in the page were filtered by visibility rules; continue paginating until next is null."
           }
         },
@@ -16359,11 +16883,25 @@
             "description": "OpenSea URL for the drop"
           },
           "active_stage": {
-            "$ref": "#/components/schemas/DropStageResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DropStageResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "The currently-minting stage, if the drop is live. Null if not minting."
           },
           "next_stage": {
-            "$ref": "#/components/schemas/DropStageResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DropStageResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "The earliest upcoming stage by start_time when the drop is not currently minting (e.g. before it starts or between stages). Null if the drop is live or has no future stages."
           }
         },
@@ -16411,10 +16949,10 @@
           },
           "max_per_wallet": {
             "type": "string",
-            "description": "Ceiling on the wallet's mints for the whole drop, not this stage alone. Cumulative: SeaDrop checks it against the wallet's lifetime minted count on the contract, so caps on different stages do not add together. Matches max_total_mintable_by_wallet on the eligibility response."
+            "description": "This stage's default per-wallet limit, as a decimal string: what the stage adds for each wallet on its list, unless that wallet's allowlist row sets its own. Limits add up across the stages a wallet is listed on, the public stage adds its own on top, and unused mints carry into later stages. For one wallet's running total through a stage, read max_total_mintable_by_wallet on the eligibility response."
           },
           "allowlist_wallet_count": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32",
             "description": "Wallets on this stage's allowlist when the drop service last synced it. Null when the stage has no synced allowlist, which includes every public sale stage; that is distinct from 0, which means the allowlist is empty. Equivalent to allowlistMemberCount on the GraphQL DropStage.",
             "example": 1200
@@ -16470,11 +17008,25 @@
             "description": "OpenSea URL for the drop"
           },
           "active_stage": {
-            "$ref": "#/components/schemas/DropStageResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DropStageResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "The currently-minting stage, if the drop is live. Null if not minting."
           },
           "next_stage": {
-            "$ref": "#/components/schemas/DropStageResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DropStageResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "The earliest upcoming stage by start_time when the drop is not currently minting (e.g. before it starts or between stages). Null if the drop is live or has no future stages."
           },
           "stages": {
@@ -16502,6 +17054,33 @@
           "opensea_url",
           "stages"
         ]
+      },
+      "DropMetadataUploadProgressResponse": {
+        "type": "object",
+        "description": "Progress of a drop's IPFS metadata upload",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "running, completed, failed, or not_found. Keep polling while running. On completed the draft holds the new base URI; publish again to put it onchain.",
+            "enum": ["running", "completed", "failed", "not_found"],
+            "example": "running"
+          },
+          "media_upload_progress": {
+            "type": ["number", "null"],
+            "format": "double",
+            "description": "Media upload progress, 0 to 100"
+          },
+          "metadata_upload_progress": {
+            "type": ["number", "null"],
+            "format": "double",
+            "description": "Metadata upload progress, 0 to 100"
+          },
+          "failure_reason": {
+            "type": ["string", "null"],
+            "description": "Why the upload failed, when status is failed"
+          }
+        },
+        "required": ["status"]
       },
       "DropEligibilityResponse": {
         "type": "object",
@@ -16531,16 +17110,16 @@
             "description": "Whether the wallet is eligible for this stage"
           },
           "price": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Mint price per token in wei (decimal string)"
           },
           "max_total_mintable_by_wallet": {
-            "type": "string",
-            "description": "Ceiling on the wallet's mints for the whole drop, all token ids included, as a decimal string. Cumulative rather than per stage: SeaDrop checks it against the wallet's lifetime minted count on the contract, so caps on different stages do not add together, and a wallet that has already reached a later stage's cap cannot mint on it."
+            "type": ["string", "null"],
+            "description": "The wallet's running cap through this stage, all token ids included, as a decimal string: the limits of every stage up to and including this one that the wallet is listed on, added together, clamped to supply. The public stage's own limit is added only on the public stage's result, not on any presale's. SeaDrop checks the cap against the wallet's lifetime minted count on the contract, so subtract what the wallet has minted to get what it can still mint."
           },
           "max_total_mintable_by_wallet_per_token": {
-            "type": "string",
-            "description": "The same ceiling for a single token id (ERC-1155), as a decimal string. Also a lifetime total for that token id rather than a per-stage allowance."
+            "type": ["string", "null"],
+            "description": "The same running cap for a single token id (ERC-1155), as a decimal string: the per-token limits of every stage up to and including this one that the wallet is listed on, added together, clamped to supply. As with the whole-drop cap, the public stage's own per-token limit is added only on the public stage's result."
           }
         },
         "required": ["is_eligible", "stage_uuid"]
@@ -16555,15 +17134,15 @@
             "example": "success"
           },
           "contract_address": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Deployed contract address (only present on success)"
           },
           "chain": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Chain slug (only present on success)"
           },
           "collection_slug": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Linked collection slug (only present on success, may take time to materialize)"
           }
         },
@@ -16601,8 +17180,8 @@
             "description": "Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own."
           },
           "banner_image_url": {
-            "type": "string",
-            "description": "Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one."
+            "type": ["string", "null"],
+            "description": "Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived."
           },
           "owner": {
             "type": "string"
@@ -16940,7 +17519,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results"
           }
         },
@@ -16960,7 +17539,7 @@
             "description": "Price in token units"
           },
           "symbol": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Payment token symbol"
           },
           "chain": {
@@ -17002,7 +17581,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results"
           }
         },
@@ -17032,20 +17611,20 @@
             "description": "Timestamp of the data point"
           },
           "usd_price": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Floor price in USD"
           },
           "token_unit": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Floor price in token units"
           },
           "symbol": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Payment token symbol"
           },
           "chain": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Blockchain chain"
           }
         },
@@ -17213,7 +17792,7 @@
             "description": "Unique identifier for the pool"
           },
           "pool_address": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "On-chain address of the pool contract"
           },
           "base_token": {
@@ -17225,24 +17804,24 @@
             "description": "Quote token contract identifier (chain/address)"
           },
           "base_reserve_usd": {
-            "type": "number",
+            "type": ["number", "null"],
             "description": "USD value of base token reserves"
           },
           "quote_reserve_usd": {
-            "type": "number",
+            "type": ["number", "null"],
             "description": "USD value of quote token reserves"
           },
           "total_reserve_usd": {
-            "type": "number",
+            "type": ["number", "null"],
             "description": "Total USD value of reserves in the pool"
           },
           "bonding_curve_progress": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "float",
             "description": "Bonding curve progress percentage (0-100)"
           },
           "is_graduated": {
-            "type": "boolean",
+            "type": ["boolean", "null"],
             "description": "Whether the token has graduated from its bonding curve"
           }
         },
@@ -17265,7 +17844,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results"
           }
         },
@@ -17312,12 +17891,12 @@
             "description": "Token quantity in display units"
           },
           "percentage_held": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "float",
             "description": "Percentage of total supply held by this address"
           },
           "usd_value": {
-            "type": "number",
+            "type": ["number", "null"],
             "description": "USD value of the holding"
           },
           "owner_address": {
@@ -17325,7 +17904,7 @@
             "description": "Wallet address of the holder"
           },
           "owner_display_name": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Display name of the holder"
           }
         },
@@ -17343,16 +17922,23 @@
             }
           },
           "total_count": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int32",
             "description": "Total number of holders"
           },
           "distribution": {
-            "$ref": "#/components/schemas/TokenHolderDistributionResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenHolderDistributionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Holder distribution health metrics"
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results"
           }
         },
@@ -17405,7 +17991,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results"
           }
         },
@@ -17441,11 +18027,11 @@
             "description": "Transaction hash"
           },
           "user_op_hash": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "User operation hash (for account abstraction)"
           },
           "swap_protocol": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Swap protocol used"
           },
           "chain": {
@@ -17477,7 +18063,7 @@
             "description": "Token contract address"
           },
           "computed_at": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time",
             "description": "End time of the oldest returned aggregation window, or null when no window is returned"
           },
@@ -17513,13 +18099,13 @@
             "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
           },
           "unique_buyer_count": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64",
             "description": "Distinct wallets that bought this token during the window. Only populated for the 1h and 24h windows; always null for 5m and 4h, which have no materialized source. Null also means the value is unavailable or not yet authoritative for this token, which remains a valid runtime state. Zero is an authoritative zero, so do not treat null as 0.",
             "example": 412
           },
           "unique_seller_count": {
-            "type": "integer",
+            "type": ["integer", "null"],
             "format": "int64",
             "description": "Distinct wallets that sold this token during the window. Only populated for the 1h and 24h windows; always null for 5m and 4h, which have no materialized source. Null also means the value is unavailable or not yet authoritative for this token, which remains a valid runtime state. Zero is an authoritative zero, so do not treat null as 0.",
             "example": 377
@@ -17618,7 +18204,7 @@
             "description": "Sale price in token units"
           },
           "symbol": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Payment token symbol"
           },
           "chain": {
@@ -17779,7 +18365,14 @@
         "description": "Public agent ownership relationships for a profile",
         "properties": {
           "agent_owner": {
-            "$ref": "#/components/schemas/AgentProfileSummaryResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentProfileSummaryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "The account confirmed to own this one as its agent. Null when there is none, which is ordinary rather than exceptional: an agent nobody declared is a valid agent account. Only a relationship both accounts confirmed appears here."
           },
           "agents": {
@@ -17824,11 +18417,11 @@
             "example": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
           },
           "username": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "OpenSea username, if available"
           },
           "ens_name": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Primary ENS name, if available",
             "example": "vitalik.eth"
           }
@@ -17859,7 +18452,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results"
           }
         },
@@ -17890,7 +18483,7 @@
             "example": "USDC"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the token's image"
           },
           "usd_price": {
@@ -17925,12 +18518,12 @@
             "enum": ["OK", "WARNING", "SPAM", "LOW_LIQUIDITY", "LOW_VALUE"]
           },
           "base_token_liquidity_usd": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "USD value of base token reserves in the top liquidity pool paired with a curated quote token",
             "example": "125000.5"
           },
           "quote_token_liquidity_usd": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "USD value of quote token reserves in the top liquidity pool paired with a curated quote token",
             "example": "125000.5"
           }
@@ -17959,7 +18552,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results"
           }
         },
@@ -17983,23 +18576,44 @@
             "description": "Address that initiated the activity"
           },
           "to": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Recipient address for transfers"
           },
           "token": {
-            "$ref": "#/components/schemas/TokenAmountResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenAmountResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Token amount for transfers"
           },
           "from_token": {
-            "$ref": "#/components/schemas/TokenAmountResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenAmountResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Token sold/swapped from"
           },
           "to_token": {
-            "$ref": "#/components/schemas/TokenAmountResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenAmountResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Token received/swapped to"
           },
           "swap_protocol": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Swap protocol used"
           },
           "transaction_hash": {
@@ -18007,7 +18621,7 @@
             "description": "Transaction hash"
           },
           "user_op_hash": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "User operation hash (for account abstraction)"
           },
           "timestamp": {
@@ -18038,12 +18652,12 @@
             "example": "27230.5"
           },
           "pnl_absolute": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Absolute P&L in USD over the timeframe",
             "example": "+1250.00"
           },
           "pnl_percentage": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Percentage P&L over the timeframe",
             "example": "+1.01"
           },
@@ -18171,12 +18785,12 @@
             "example": "1500000000"
           },
           "price_usd": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Token price in USD at the time of the transfer, or null if unknown.",
             "example": "0.0425"
           },
           "value_usd": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "USD value of the transfer, or null if unknown.",
             "example": "63.75"
           },
@@ -18186,13 +18800,13 @@
             "example": "0xabc123"
           },
           "block_time": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Block time of the transfer, or null if unknown.",
             "example": 1777334400
           },
           "transfer_type": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Type of transfer, used to distinguish zero-cost acquisitions (e.g. AIRDROP, CEX_TRANSFER) from buys/sells (e.g. SWAP_BUY, SWAP_SELL). Null if unclassified.",
             "example": "SWAP_BUY"
           }
@@ -18217,7 +18831,7 @@
             "example": 17
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results, or null if there are no more pages"
           }
         },
@@ -18228,7 +18842,14 @@
         "description": "A single realized (closed) trading position. Realized P&L and cost basis are computed via FIFO (first-in, first-out) lot matching.",
         "properties": {
           "currency": {
-            "$ref": "#/components/schemas/TokenBaseResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenBaseResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "The currency that was traded. Null if the currency is no longer surfaced (e.g. under trust & safety enforcement)."
           },
           "realized_pnl_usd": {
@@ -18257,7 +18878,7 @@
             "example": "0.0425"
           },
           "closed_at": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "When the position was closed (last sell). Null if unknown.",
             "example": 1777334400
@@ -18267,7 +18888,7 @@
             "description": "Whether this was a round-trip OpenSea trade (bought and sold on OpenSea)."
           },
           "first_acquired_at": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "When the tokens in this position were first acquired. Null if unknown.",
             "example": 1768435200
@@ -18300,7 +18921,7 @@
             "example": 42
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results, or null if there are no more pages"
           }
         },
@@ -18323,15 +18944,15 @@
             "description": "The perpetual future symbol"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the perpetual future image"
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Description of the perpetual future"
           },
           "created_at": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Created timestamp"
           },
@@ -18370,7 +18991,7 @@
             }
           },
           "market": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Market"
           }
         },
@@ -18399,7 +19020,7 @@
             }
           },
           "next": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Cursor for the next page of results"
           }
         },
@@ -18422,15 +19043,15 @@
             "description": "The perpetual future symbol"
           },
           "image_url": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "URL of the perpetual future image"
           },
           "description": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Description of the perpetual future"
           },
           "created_at": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "double",
             "description": "Created timestamp"
           },
@@ -18469,11 +19090,18 @@
             }
           },
           "market": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "Market"
           },
           "stats": {
-            "$ref": "#/components/schemas/PerpetualFutureStatsResponse",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PerpetualFutureStatsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Market statistics"
           }
         },
@@ -18495,32 +19123,32 @@
         "description": "Market statistics for a perpetual future",
         "properties": {
           "price_usd": {
-            "type": "number",
+            "type": ["number", "null"],
             "description": "Price in USD"
           },
           "price_change_24h": {
-            "type": "number",
+            "type": ["number", "null"],
             "format": "float",
             "description": "24-hour price change percentage"
           },
           "volume_24h": {
-            "type": "number",
+            "type": ["number", "null"],
             "description": "24-hour volume in USD"
           },
           "mark_price": {
-            "type": "number",
+            "type": ["number", "null"],
             "description": "Mark price"
           },
           "oracle_price": {
-            "type": "number",
+            "type": ["number", "null"],
             "description": "Oracle price"
           },
           "funding_rate": {
-            "type": "number",
+            "type": ["number", "null"],
             "description": "Funding rate"
           },
           "open_interest": {
-            "type": "number",
+            "type": ["number", "null"],
             "description": "Open interest"
           }
         }
@@ -18542,8 +19170,8 @@
             "description": "Square avatar for the collection, used wherever it is named. Falls back to a representative item's image when the collection has none of its own."
           },
           "banner_image_url": {
-            "type": "string",
-            "description": "Wide banner for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one."
+            "type": ["string", "null"],
+            "description": "Wide image for the collection, and the only wide image on this API. Use it for a header or hero slot; image_url is square and will not fill one. On the single-collection endpoint it is the collection's hero image, else its hero video's poster, else its banner; on list endpoints it is the banner. Always a still image: a video gets a frame from it, or null when no still can be derived."
           },
           "owner": {
             "type": "string"
@@ -18781,7 +19409,12 @@
             "/api/v2/drops/{slug}/items",
             "/api/v2/drops/{slug}/items/media",
             "/api/v2/drops/{slug}/items/media/save",
-            "/api/v2/drops/{slug}/items/{token_id}"
+            "/api/v2/drops/{slug}/items/manifest",
+            "/api/v2/drops/{slug}/items/{token_id}",
+            "/api/v2/drops/{slug}/metadata/ipfs",
+            "/api/v2/drops/{slug}/metadata/ipfs/{workflow_execution_id}",
+            "/api/v2/drops/{slug}/publish",
+            "/api/v2/drops/{slug}/unpublish"
           ],
           [
             "/api/v2/collections/{slug}",
@@ -18907,19 +19540,47 @@
     },
     "responses": {
       "BadRequest": {
-        "description": "For error reasons, review the response data."
+        "description": "For error reasons, review the response data.",
+        "content": {
+          "*/*": {
+            "schema": {
+              "$ref": "#/components/schemas/V1ErrorWrapper"
+            }
+          }
+        }
       },
       "Unauthorized": {
         "description": "Invalid or missing API key"
       },
       "Forbidden": {
-        "description": "Wallet token lacks permission for this request"
+        "description": "Wallet token lacks permission for this request",
+        "content": {
+          "*/*": {
+            "schema": {
+              "$ref": "#/components/schemas/V1ErrorWrapper"
+            }
+          }
+        }
       },
       "NotFound": {
-        "description": "Resource not found"
+        "description": "Resource not found",
+        "content": {
+          "*/*": {
+            "schema": {
+              "$ref": "#/components/schemas/V1ErrorWrapper"
+            }
+          }
+        }
       },
       "Conflict": {
-        "description": "Resource conflict"
+        "description": "Resource conflict",
+        "content": {
+          "*/*": {
+            "schema": {
+              "$ref": "#/components/schemas/V1ErrorWrapper"
+            }
+          }
+        }
       },
       "RateLimit": {
         "description": "Rate limit exceeded"

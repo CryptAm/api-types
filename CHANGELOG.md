@@ -1,5 +1,17 @@
 # @opensea/api-types
 
+## 0.13.0
+
+### Minor Changes
+
+- 7d51b1f: Sync OpenAPI spec.
+
+  - Adds the drop publish flow operations: `build_drop_publish_transaction`, `build_drop_unpublish_transaction`, `upload_drop_metadata_to_ipfs`, `get_drop_metadata_ipfs_progress` and `upload_drop_collection_manifest`, with the `DropTransactionResponse`, `DropMetadataUploadResponse` and `DropMetadataUploadProgressResponse` schemas, and adds their routes to the `write:drops` scope.
+  - `SelfMintDropItemResponse` now carries the transaction fields plus `token_id`.
+  - Fields the API documents as nullable are now typed nullable: the spec is OpenAPI 3.1 and os2-core now emits `type: [T, "null"]` or `anyOf: [ref, null]` for them. Code that reads these fields may need a null check. This is why the bump is minor.
+  - `label` is now required on drop stage edits (`SaveDropEditsStageRequest`). A stage without one was accepted before but could never be published.
+  - The shared 400/403/404/409 responses document the `V1ErrorWrapper` body, `NftSearchResponse` gains the optional `best_listing` field, and field descriptions are updated.
+
 ## 0.12.1
 
 ### Patch Changes
