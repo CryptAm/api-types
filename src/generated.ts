@@ -14,7 +14,11 @@ export interface paths {
         get?: never;
         /**
          * Build transaction data for updating a SelfMint drop item
-         * @description Returns ready-to-sign onchain transaction data for updating a SelfMint drop item. The caller is responsible for signing and broadcasting the transaction.
+         * @description Changes an existing self-mint token's metadata and returns the ready-to-sign transaction that points the contract's base URI at the regenerated metadata. It does not change the token's supply. A token id that does not exist on the drop returns 404, and a drop that is not an ERC-1155 self-mint drop returns 400.
+         *
+         *     An ERC-1155 self-mint drop has no stages, publish step, or public mint. Each item is its own token id: saving one returns a transaction that creates it and mints its whole `supply` to the contract owner. The transaction's `to` is the drop's configurer contract (the one its getConfigurer() returns), not the drop contract, and it must be sent from `from`, the contract owner.
+         *
+         *     PATCH /api/v2/drops/{slug}/items/{token_id} takes the same body and saves the same metadata, but returns no transaction, so the contract keeps pointing at the old metadata. On a self-mint drop, use this endpoint and send its transaction.
          */
         put: operations["update_self_mint_drop_item"];
         post?: never;
@@ -23,7 +27,11 @@ export interface paths {
         head?: never;
         /**
          * Update drop item
-         * @description Update drop item metadata.
+         * @description Saves new metadata for one existing item and returns the updated item. It returns no transaction. A token id that does not exist on the drop returns 404.
+         *
+         *     On an ERC-721 SeaDrop V1 drop that is already revealed, it also regenerates the drop's metadata on IPFS and saves the new base URI to the draft; publish with POST /api/v2/drops/{slug}/publish to put it onchain. Before reveal, the change is held until POST /api/v2/drops/{slug}/metadata/ipfs runs.
+         *
+         *     On an ERC-1155 self-mint drop, the change does not reach the contract. Use PUT /api/v2/drops/{slug}/items/{token_id} instead: it makes the same change and returns the transaction that puts it onchain.
          */
         patch: operations["update_drop_item"];
         trace?: never;
@@ -611,16 +619,20 @@ export interface paths {
         /**
          * Get drop by collection slug
          * @description Get detailed drop information for a collection, including stages and supply.
+         *
+         *     `stages` is in the order the drop stores them, not sorted by start time. For a drop saved through POST /api/v2/drops/{slug} that puts the public stage first, although it runs last; sort by `start_time` for the schedule.
          */
         get: operations["get_drop_by_slug"];
         put?: never;
         /**
          * Update Creator Studio drop edits
-         * @description Update an existing ERC-721 SeaDrop V1 drop and its stages.
+         * @description Update an existing ERC-721 SeaDrop V1 drop and its stages. Only the collection owner can call it, and any other drop type returns 400.
          *
          *     Saves a Creator Studio draft. It does not change the live drop: SeaDrop stages are onchain contract state, so the draft has to be published separately before buyers see it. A 200 here means the draft was accepted, not that the drop changed.
          *
-         *     `stages` replaces the whole set rather than merging, so send every stage the drop should end up with, including ones you are not changing. Reuse an existing stage uuid to update it, supply a new UUID to add one, and omit a stage to delete it.
+         *     `stages` replaces the whole set rather than merging, so send every stage the drop should end up with, including ones you are not changing. It is required even to change only `max_supply` or `creator_payout_address`. Reuse an existing stage uuid to update it, supply a new UUID to add one, and omit a stage to delete it. Every stage needs a `label`, and every price must be in the chain's native currency, with `price.contract_address` set to 0x0000000000000000000000000000000000000000.
+         *
+         *     Once minting has started, a save that raises `max_supply` or the price of the stage being minted from can be refused with 400. A drop whose supply or price is raised onchain during its mint is disabled.
          *
          *     The stage list has four rules, and rules 2 and 4 interact in a way worth reading before the first attempt:
          *
@@ -677,6 +689,8 @@ export interface paths {
          *
          *     Send the transaction from `from`, the contract's onchain owner. Only the collection owner can call this endpoint.
          *
+         *     Only ERC-721 SeaDrop V1 drops are published. An ERC-1155 self-mint drop has no publish step and returns 400: each of its items goes onchain through the transaction POST /api/v2/drops/{slug}/items returns.
+         *
          *     A 400 carries the reason the drop cannot be published, for example that it is disabled, its launch date is still pending, or it has no saved edits to apply. After a first publish, the drop is live once GET /api/v2/drops/{slug} returns it, which happens after the transaction is mined and indexed.
          *
          *     To reveal, run POST /api/v2/drops/{slug}/metadata/ipfs, wait for it to complete, then call this endpoint again to put the new base URI onchain.
@@ -699,7 +713,9 @@ export interface paths {
         put?: never;
         /**
          * Save prereveal drop item
-         * @description Save prereveal drop item metadata.
+         * @description Sets the placeholder every token shows until the drop is revealed: one name, description, and image, from a media_token issued by POST /api/v2/drops/{slug}/items/media. It saves a placeholder base URI to the draft, so publish afterwards to put it onchain. Running POST /api/v2/drops/{slug}/metadata/ipfs later replaces it with the real metadata.
+         *
+         *     Only ERC-721 SeaDrop V1 drops have a prereveal item; any other drop type returns 400.
          */
         post: operations["save_prereveal_drop_item"];
         delete?: never;
@@ -719,7 +735,11 @@ export interface paths {
         put?: never;
         /**
          * Build mint transaction data for a drop
-         * @description Returns ready-to-sign transaction data for minting tokens from a drop. The caller is responsible for signing and submitting the transaction. No wallet authentication is required — only an API key. The minter address in the request body determines who will receive the tokens. Stage selection is handled automatically by the backend — if multiple stages are active, the first eligible stage is used.
+         * @description Returns ready-to-sign transaction data for minting tokens from a drop. The caller is responsible for signing and submitting the transaction. No wallet authentication is required, only an API key. The minter address in the request body determines who will receive the tokens. Stage selection is handled automatically by the backend: if multiple stages are active, the first eligible stage is used.
+         *
+         *     Supports ERC-721 SeaDrop V1 drops only; an ERC-1155 drop returns 400.
+         *
+         *     A 422 means the drop is mintable but this mint is not: the minter is not on the active presale's allowlist (the message names the stage and when the public stage opens), the quantity is over the wallet's limit or the remaining supply (the message says how many remain), or the minter cannot pay the price and gas.
          */
         post: operations["build_drop_mint_transaction"];
         delete?: never;
@@ -741,6 +761,10 @@ export interface paths {
          * Upload drop metadata to IPFS
          * @description Uploads every saved item's media and metadata to IPFS, then saves the resulting folder as the drop's draft base URI. Run it after POST /api/v2/drops/{slug}/items/media/save; the drop needs at least one item. It does not change the contract: call POST /api/v2/drops/{slug}/publish once it completes.
          *
+         *     This is the reveal. The base URI it writes points at the real item metadata, so a drop published after it has completed is revealed as soon as it is live. To reveal later, publish without running it (showing the prereveal item from POST /api/v2/drops/{slug}/prereveal-item), then run it and publish again when ready.
+         *
+         *     Only ERC-721 SeaDrop V1 drops are supported; any other drop type returns 400. An ERC-1155 self-mint drop uploads each item's metadata when the item is saved or updated.
+         *
          *     Only one upload runs per drop at a time. Calling again while one is running returns that upload's id. Poll GET /api/v2/drops/{slug}/metadata/ipfs/{workflow_execution_id} until status is completed or failed.
          */
         post: operations["upload_drop_metadata_to_ipfs"];
@@ -761,7 +785,11 @@ export interface paths {
         put?: never;
         /**
          * Build transaction data for creating a SelfMint drop item
-         * @description Returns ready-to-sign onchain transaction data for creating a SelfMint drop item. The caller is responsible for signing and broadcasting the transaction.
+         * @description Creates one item on an ERC-1155 self-mint drop and returns the ready-to-sign transaction that puts it onchain. Any other drop type returns 400.
+         *
+         *     An ERC-1155 self-mint drop has no stages, publish step, or public mint. Each item is its own token id: saving one returns a transaction that creates it and mints its whole `supply` to the contract owner. The transaction's `to` is the drop's configurer contract (the one its getConfigurer() returns), not the drop contract, and it must be sent from `from`, the contract owner.
+         *
+         *     Get `media_token` from POST /api/v2/drops/{slug}/items/media and upload the file to the returned storage context first. The item is stored and its token id assigned (`token_id` in the response) before this returns, so calling again creates another item rather than retrying this one; the token is minted only when the transaction confirms.
          */
         post: operations["save_self_mint_drop_item"];
         delete?: never;
@@ -801,7 +829,9 @@ export interface paths {
         put?: never;
         /**
          * Save drop item media
-         * @description Persist drop item media references.
+         * @description Saves the drop's items from media tokens issued by POST /api/v2/drops/{slug}/items/media and uploaded to storage. Each save replaces the drop's items rather than adding to them. With a manifest from POST /api/v2/drops/{slug}/items/manifest, items take their token ids and metadata from it; without one they are numbered 1 to n in the order given.
+         *
+         *     Not available on ERC-1155 self-mint drops, which return 400: create each of their items with POST /api/v2/drops/{slug}/items.
          */
         post: operations["save_drop_item_media"];
         delete?: never;
@@ -821,7 +851,7 @@ export interface paths {
         put?: never;
         /**
          * Upload drop metadata manifest
-         * @description The file is a CSV describing every item in the drop, one row per uploaded media file. Required columns are tokenID, name, description, and file_name, where file_name matches the filename passed to POST /api/v2/drops/{slug}/items/media. Optional columns are external_url, animation_url, and one attributes[<trait type>] column per trait. Upload it in two steps. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Unlike other upload contexts, the returned token is not passed to any later call: the file is stored against the drop, and the next POST /api/v2/drops/{slug}/items/media/save reads it. Send one media token per row there, because the save keeps only the files the manifest names. Without a manifest, items get token ids 1 to n in upload order, named #1 to #n, with no description or traits.
+         * @description The file is a CSV describing every item in the drop, one row per uploaded media file. Required columns are tokenID, name, description, and file_name, where file_name matches the filename passed to POST /api/v2/drops/{slug}/items/media. Optional columns are external_url, animation_url, and one attributes[<trait type>] column per trait. Upload it in two steps. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Unlike other upload contexts, the returned token is not passed to any later call: the file is stored against the drop, and the next POST /api/v2/drops/{slug}/items/media/save reads it. Send one media token per row there, because the save keeps only the files the manifest names. Without a manifest, items get token ids 1 to n in upload order, named #1 to #n, with no description or traits. Manifests do not apply to ERC-1155 self-mint drops, which return 400; each of their items is created with POST /api/v2/drops/{slug}/items.
          */
         post: operations["upload_drop_collection_manifest"];
         delete?: never;
@@ -861,7 +891,7 @@ export interface paths {
         put?: never;
         /**
          * Upload drop allowlist
-         * @description The file is CSV with a header row, and the wallet column must be named address or walletaddress. Optional per-row columns are a custom mint limit and a custom price. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Send the token as allowlist_file_token on the stage in POST /api/v2/drops/{slug}; saving the edits validates the file and rejects them if it is invalid. POST /api/v2/drops/{slug}/allowlist/validate runs the same check without saving and returns the same token. The allowlist is enforced once the drop is published with POST /api/v2/drops/{slug}/publish. The presigned upload expires about a minute after it is issued, so request the context and upload in one go rather than requesting it ahead of time.
+         * @description The file is CSV with one wallet per line: an EVM address, optionally followed by that wallet's mint limit and its mint price in the chain's native currency, in that order and separated by commas, like 0x0000000000000000000000000000000000000000, 2, 0.05. Columns are read by position, not by name. A first line that is not an address is treated as a header and skipped. A file that fails validation returns 400 naming the offending line numbers. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Send the token as allowlist_file_token on the stage in POST /api/v2/drops/{slug}; saving the edits validates the file and rejects them if it is invalid. POST /api/v2/drops/{slug}/allowlist/validate runs the same check without saving and returns the same token. The allowlist is enforced once the drop is published with POST /api/v2/drops/{slug}/publish. The presigned upload expires about a minute after it is issued, so request the context and upload in one go rather than requesting it ahead of time.
          */
         post: operations["upload_drop_allowlist"];
         delete?: never;
@@ -881,7 +911,7 @@ export interface paths {
         put?: never;
         /**
          * Validate drop allowlist
-         * @description Validate an uploaded drop allowlist file token.
+         * @description Checks an allowlist uploaded with the context from POST /api/v2/drops/{slug}/allowlist, without saving anything, and returns the token to put in a `signed_presale` stage's `allowlist_file_token` in POST /api/v2/drops/{slug}. A file that fails returns 400 naming the offending line numbers and what is wrong with them. See upload_drop_allowlist for the file format.
          */
         post: operations["validate_drop_allowlist"];
         delete?: never;
@@ -901,7 +931,16 @@ export interface paths {
         put?: never;
         /**
          * Build deploy contract transaction data
-         * @description Returns ready-to-sign transaction data for deploying a new NFT drop contract. The caller is responsible for signing and submitting the transaction.
+         * @description Returns a ready-to-sign transaction that deploys a new drop contract. Sign and send it from `sender`, which the response repeats as `from`; that wallet owns the contract.
+         *
+         *     Deployable `drop_type` and `token_type` combinations:
+         *
+         *     - `seadrop_v1_erc721` with `erc721_clone` or `erc721_standard`: an ERC-721 SeaDrop V1 drop, with stages, allowlists, reveal, and public minting. `erc721_clone` creates the contract through OpenSea's clone factory; `erc721_standard` deploys the full contract bytecode.
+         *     - `seadrop_v2_erc1155_self_mint` with `erc1155_clone`: an ERC-1155 self-mint drop, where the owner creates each token and mints its whole supply to themselves. It has no stages, publish step, or public mint.
+         *
+         *     Every other combination returns 400.
+         *
+         *     Next, poll GET /api/v2/drops/deploy/{chain}/{tx_hash}/receipt with the hash of the sent transaction until `status` is `success`. The receipt carries the contract address and, once the new collection is indexed, the `collection_slug` every other drop endpoint takes.
          */
         post: operations["deploy_drop_contract"];
         delete?: never;
@@ -1845,7 +1884,7 @@ export interface paths {
         };
         /**
          * Get deploy contract receipt
-         * @description Check the status of a contract deployment transaction. Returns the deployment status and, on success, the deployed contract address and linked collection slug.
+         * @description Check the status of a contract deployment transaction. Returns the deployment status and, on success, the deployed contract address and linked collection slug. Poll while the status is pending. not_found means the chain has no transaction with this hash, mined or pending: check the chain and the hash. A transaction submitted a moment ago can briefly read not_found before it reaches the node, so poll a few more times before giving up.
          */
         get: operations["get_deploy_contract_receipt"];
         put?: never;
@@ -4442,7 +4481,10 @@ export interface components {
         SaveDropEditsPriceRequest: {
             /** @description Price unit as a decimal string */
             unit: string;
-            /** @description Contract address for the price token */
+            /**
+             * @description Price currency. SeaDrop V1 stages are priced in the chain's native currency only, so this must be 0x0000000000000000000000000000000000000000.
+             * @example 0x0000000000000000000000000000000000000000
+             */
             contract_address: string;
         };
         /** @description Request to save Creator Studio drop edits */
@@ -4494,7 +4536,7 @@ export interface components {
             label: string;
             /** @description Stage description */
             description?: string | null;
-            /** @description Allowlist file token */
+            /** @description For a `signed_presale` stage, the token returned by POST /api/v2/drops/{slug}/allowlist/validate (or the upload context's token) for the stage's allowlist file. */
             allowlist_file_token?: string | null;
         };
         /** @description Response body for saving a prereveal drop item */
@@ -4570,7 +4612,13 @@ export interface components {
         };
         /** @description Request body for uploading drop item media */
         UploadDropItemMediaRequest: {
-            /** @description Filenames to upload */
+            /**
+             * @description Filenames to upload, one upload context per name. Between 1 and 50 per request, each unique within the request. Before its extension a filename may contain only letters, digits, periods, underscores, and hyphens (no spaces or slashes). The extension is matched ignoring case and must be one of: png, jpeg, jpg, avif, webp, gif, svg, tiff, ico, mp4, mov, mp3, wav, html, glb, gltf, pdf, m4v, webm. A request that breaks any rule is rejected with a 400 that names every offending filename.
+             * @example [
+             *       "1.png",
+             *       "2.png"
+             *     ]
+             */
             filenames: string[];
         };
         /** @description Response body for saving drop item media */
@@ -4625,6 +4673,8 @@ export interface components {
         DropDeployResponse: {
             /** @description Transaction target contract address */
             to: string;
+            /** @description Address the transaction must be sent from: the request's `sender`, which becomes the contract owner. */
+            from: string;
             /** @description Encoded transaction data (hex) */
             data: string;
             /** @description Transaction value in wei (hex) */
@@ -4650,17 +4700,17 @@ export interface components {
              */
             contract_symbol: string;
             /**
-             * @description Drop type (see validation error for supported values)
+             * @description Drop type. Deployable values are `seadrop_v1_erc721` (with token_type `erc721_clone` or `erc721_standard`) and `seadrop_v2_erc1155_self_mint` (with token_type `erc1155_clone`). Other combinations return 400.
              * @example seadrop_v1_erc721
              */
             drop_type: string;
             /**
-             * @description Token type (see validation error for supported values)
-             * @example erc721_standard
+             * @description Contract token type. `erc721_clone` or `erc721_standard` for drop_type `seadrop_v1_erc721`; `erc1155_clone` for drop_type `seadrop_v2_erc1155_self_mint`.
+             * @example erc721_clone
              */
             token_type: string;
             /**
-             * @description Deployer wallet address
+             * @description Deployer wallet address. The transaction must be sent from it, and it becomes the contract owner that publishes the drop and creates self-mint items.
              * @example 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
              */
             sender: string;
@@ -6026,10 +6076,11 @@ export interface components {
         /** @description Deploy contract receipt status */
         DropDeployReceiptResponse: {
             /**
-             * @description Deployment status: pending, success, or failed
+             * @description Deployment status: pending (known to the chain, not mined yet), success, failed, or not_found (the chain has no transaction with this hash)
              * @example success
+             * @enum {string}
              */
-            status: string;
+            status: "pending" | "success" | "failed" | "not_found";
             /** @description Deployed contract address (only present on success) */
             contract_address?: string | null;
             /** @description Chain slug (only present on success) */
@@ -7216,6 +7267,7 @@ export interface components {
         /** @description Rate limit exceeded */
         RateLimit: {
             headers: {
+                "Retry-After": components["headers"]["Retry-After"];
                 [name: string]: unknown;
             };
             content?: never;
@@ -7235,6 +7287,8 @@ export interface components {
         "X-RateLimit-Limit": number;
         /** @description Remaining requests in current window */
         "X-RateLimit-Remaining": number;
+        /** @description Seconds to wait before retrying. Sent with 429 rate-limit responses and with 503 responses the request can be retried after. */
+        "Retry-After": number;
         /** @description Unix epoch timestamp when the rate limit window resets */
         "X-RateLimit-Reset": number;
     };
@@ -7296,6 +7350,15 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["V1ErrorWrapper"];
+                };
+            };
+            /** @description The drop's contract is not a configured SeaDrop V2 ERC-1155 self-mint contract (its configurer() call reverts or returns the zero address). Nothing is saved; retrying does not help. */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8588,7 +8651,7 @@ export interface operations {
                     "*/*": components["schemas"]["DropMintResponse"];
                 };
             };
-            /** @description Invalid request: bad address format, invalid quantity, or missing required fields */
+            /** @description Invalid request: bad address format, invalid quantity, missing required fields, or a drop type this endpoint does not mint (ERC-1155) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -8625,6 +8688,16 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            /** @description A backend service timed out or was unavailable. Nothing was minted; the request can be retried after the Retry-After delay */
+            503: {
+                headers: {
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["V1ErrorWrapper"];
+                };
+            };
         };
     };
     upload_drop_metadata_to_ipfs: {
@@ -8707,6 +8780,15 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["V1ErrorWrapper"];
+                };
+            };
+            /** @description The drop's contract is not a configured SeaDrop V2 ERC-1155 self-mint contract (its configurer() call reverts or returns the zero address). Nothing is saved; retrying does not help. */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8899,6 +8981,16 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            /** @description A backend service timed out or was unavailable. Nothing was minted; the request can be retried after the Retry-After delay */
+            503: {
+                headers: {
+                    "Retry-After": components["headers"]["Retry-After"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["V1ErrorWrapper"];
+                };
+            };
         };
     };
     upload_drop_allowlist: {
@@ -9194,6 +9286,7 @@ export interface operations {
             /** @description Key creation rate limit exceeded */
             429: {
                 headers: {
+                    "Retry-After": components["headers"]["Retry-After"];
                     [name: string]: unknown;
                 };
                 content: {

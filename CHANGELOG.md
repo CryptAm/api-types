@@ -1,5 +1,11 @@
 # @opensea/api-types
 
+## 0.14.1
+
+### Patch Changes
+
+- 749dc16: Sync OpenAPI spec. `DropDeployResponse` gains `from`, the address that must send the deploy transaction. Drop mint and cross-chain mint document a retryable 503, which, like every 429, now declares the `Retry-After` response header (seconds, integer), and the self-mint item create and update operations document a 422 for a contract that does not support self-mint. Drop operation and schema descriptions now cover each drop type's lifecycle, the deployable drop and token type combinations, stage rules, reveal, the allowlist file format, media filename rules and when to use PUT or PATCH for items.
+
 ## 0.14.0
 
 ### Minor Changes
