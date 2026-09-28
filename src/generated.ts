@@ -632,6 +632,8 @@ export interface paths {
          *
          *     `stages` replaces the whole set rather than merging, so send every stage the drop should end up with, including ones you are not changing. It is required even to change only `max_supply` or `creator_payout_address`. Reuse an existing stage uuid to update it, supply a new UUID to add one, and omit a stage to delete it. Every stage needs a `label`, and every price must be in the chain's native currency, with `price.contract_address` set to 0x0000000000000000000000000000000000000000.
          *
+         *     A stage with a price above zero needs a creator payout address, the wallet that receives mint proceeds: SeaDrop reverts every paid mint while the contract has none. If the contract has no payout address yet, send `creator_payout_address` with the stages; a save with a paid stage and no payout address anywhere returns 400. Free stages need none.
+         *
          *     Once minting has started, a save that raises `max_supply` or the price of the stage being minted from can be refused with 400. A drop whose supply or price is raised onchain during its mint is disabled.
          *
          *     The stage list has four rules, and rules 2 and 4 interact in a way worth reading before the first attempt:
@@ -691,7 +693,7 @@ export interface paths {
          *
          *     Only ERC-721 SeaDrop V1 drops are published. An ERC-1155 self-mint drop has no publish step and returns 400: each of its items goes onchain through the transaction POST /api/v2/drops/{slug}/items returns.
          *
-         *     A 400 carries the reason the drop cannot be published, for example that it is disabled, its launch date is still pending, or it has no saved edits to apply. After a first publish, the drop is live once GET /api/v2/drops/{slug} returns it, which happens after the transaction is mined and indexed.
+         *     A 400 carries the reason the drop cannot be published, for example that it is disabled, its launch date is still pending, it has no saved edits to apply, or a stage has a price while neither the saved edits nor the contract has a creator payout address (every paid mint would revert). After a first publish, the drop is live once GET /api/v2/drops/{slug} returns it, which happens after the transaction is mined and indexed.
          *
          *     To reveal, run POST /api/v2/drops/{slug}/metadata/ipfs, wait for it to complete, then call this endpoint again to put the new base URI onchain.
          */
@@ -739,7 +741,7 @@ export interface paths {
          *
          *     Supports ERC-721 SeaDrop V1 drops only; an ERC-1155 drop returns 400.
          *
-         *     A 422 means the drop is mintable but this mint is not: the minter is not on the active presale's allowlist (the message names the stage and when the public stage opens), the quantity is over the wallet's limit or the remaining supply (the message says how many remain), or the minter cannot pay the price and gas.
+         *     A 422 means the drop is mintable but this mint is not: the minter is not on the active presale's allowlist (the message names the stage and when the public stage opens), the quantity is over the wallet's limit or the remaining supply (the message says how many remain), the minter cannot pay the price and gas, or the active stage has a price and the drop has no creator payout address, so every paid mint would revert until the creator sets one.
          */
         post: operations["build_drop_mint_transaction"];
         delete?: never;
@@ -4479,7 +4481,10 @@ export interface components {
         };
         /** @description Native token price for a Creator Studio drop stage */
         SaveDropEditsPriceRequest: {
-            /** @description Price unit as a decimal string */
+            /**
+             * @description Price per token in whole units of the chain's native currency, as a decimal string: "0.05" is 0.05 ETH on Ethereum or Base, and "0" is a free stage. This is not wei. The stages in GET /api/v2/drops/{slug} report `price` in wei, so divide that value by 10^18 before sending it back here.
+             * @example 0.05
+             */
             unit: string;
             /**
              * @description Price currency. SeaDrop V1 stages are priced in the chain's native currency only, so this must be 0x0000000000000000000000000000000000000000.
@@ -4493,7 +4498,10 @@ export interface components {
             stages: components["schemas"]["SaveDropEditsStageRequest"][];
             /** @description Maximum supply for the drop as a decimal string */
             max_supply?: string | null;
-            /** @description Creator payout address */
+            /**
+             * @description The wallet that receives mint proceeds, written to the contract on the next publish. Required when any stage has a price above zero and the contract has no payout address yet: SeaDrop reverts every paid mint while none is set, so such a save returns 400. Free drops can omit it. Each save replaces the drafted value, so a save that omits it drops any address an earlier save drafted and keeps the one already onchain. Must not be the zero address.
+             * @example 0x1234567890123456789012345678901234567890
+             */
             creator_payout_address?: string | null;
             /**
              * @description Set when saving a configuration the creator has not chosen a launch date for. Stage start and end times are still required, but they are held as a placeholder rather than a schedule: the whole stage set is shifted so the earliest stage opens at the Unix epoch, preserving each stage's duration and the gaps between them, and publishing the drop is refused until a launch date is set. Omit it to leave the drop scheduled; an explicit null is rejected.
@@ -6424,8 +6432,18 @@ export interface components {
              */
             total_holders: number;
             /**
+             * Format: int32
+             * @description Size of the measured top-holder cohort: 250, or the total holder count when fewer
+             */
+            top_holders_count: number;
+            /**
              * Format: float
-             * @description Percentage of total supply held by the top 1% of holders (0-100)
+             * @description Percentage of eligible supply (all holdings after mint/LP/CEX/burn exclusions) held by the top 250 holders (0-100)
+             */
+            top_holders_concentration: number;
+            /**
+             * Format: float
+             * @description Deprecated: percentage of eligible supply (after mint/LP/CEX/burn exclusions) held by the top 1% of holders (0-100), approximated from the fetched top-250 rows for tokens whose 1% cohort exceeds 250 holders; use top_holders_concentration
              */
             top_one_percent_concentration: number;
             /**
@@ -8678,7 +8696,7 @@ export interface operations {
                     "*/*": components["schemas"]["V1ErrorWrapper"];
                 };
             };
-            /** @description Minting precondition failed: insufficient native balance, wallet not in allowlist, mint limit exceeded, or supply exhausted */
+            /** @description Minting precondition failed: insufficient native balance, wallet not in allowlist, mint limit exceeded, supply exhausted, or a paid stage on a drop with no creator payout address */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -8971,7 +8989,7 @@ export interface operations {
                     "*/*": components["schemas"]["V1ErrorWrapper"];
                 };
             };
-            /** @description Minting precondition failed, including an ineligible wallet, exhausted supply, insufficient balance, or a payer that is not allowed for the active presale */
+            /** @description Minting precondition failed, including an ineligible wallet, exhausted supply, insufficient balance, a payer that is not allowed for the active presale, a paid stage on a drop with no creator payout address, or a mint Relay reports would fail on the drop's chain (DESTINATION_TX_FAILED). Retrying the same request does not help. */
             422: {
                 headers: {
                     [name: string]: unknown;

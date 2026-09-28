@@ -1931,7 +1931,7 @@
       "post": {
         "tags": ["Drops Endpoints"],
         "summary": "Update Creator Studio drop edits",
-        "description": "Update an existing ERC-721 SeaDrop V1 drop and its stages. Only the collection owner can call it, and any other drop type returns 400.\n\nSaves a Creator Studio draft. It does not change the live drop: SeaDrop stages are onchain contract state, so the draft has to be published separately before buyers see it. A 200 here means the draft was accepted, not that the drop changed.\n\n`stages` replaces the whole set rather than merging, so send every stage the drop should end up with, including ones you are not changing. It is required even to change only `max_supply` or `creator_payout_address`. Reuse an existing stage uuid to update it, supply a new UUID to add one, and omit a stage to delete it. Every stage needs a `label`, and every price must be in the chain's native currency, with `price.contract_address` set to 0x0000000000000000000000000000000000000000.\n\nOnce minting has started, a save that raises `max_supply` or the price of the stage being minted from can be refused with 400. A drop whose supply or price is raised onchain during its mint is disabled.\n\nThe stage list has four rules, and rules 2 and 4 interact in a way worth reading before the first attempt:\n\n1. Exactly one stage must be `public_sale`.\n2. That public stage must be first in the array.\n3. The presales, meaning every stage after the first, must be contiguous among themselves: each one starts exactly when the previous presale ended. The first presale start time is not constrained.\n4. The last presale must end exactly when the public stage starts.\n\nTogether, 2 and 4 mean array order is not chronological order: the public stage is listed first and runs last, with the presales running in array order before it. A drop with two allowlist stages therefore sends `[public, presale1, presale2]` while time runs presale1, then presale2, then public. Rule 3 does not tie presale1 back to the public stage, which is why the chain reads forward from presale1 rather than from the array head.\n\nEach stage's `max_total_mintable_by_wallet` is what that stage adds for a wallet, not a running total. Limits add up across the stages a wallet is listed on, the public stage adds its own limit on top, and mints a wallet leaves unused carry into later stages. So presales of 2 and 1 plus a public limit of 1 let a wallet on both lists mint 4.",
+        "description": "Update an existing ERC-721 SeaDrop V1 drop and its stages. Only the collection owner can call it, and any other drop type returns 400.\n\nSaves a Creator Studio draft. It does not change the live drop: SeaDrop stages are onchain contract state, so the draft has to be published separately before buyers see it. A 200 here means the draft was accepted, not that the drop changed.\n\n`stages` replaces the whole set rather than merging, so send every stage the drop should end up with, including ones you are not changing. It is required even to change only `max_supply` or `creator_payout_address`. Reuse an existing stage uuid to update it, supply a new UUID to add one, and omit a stage to delete it. Every stage needs a `label`, and every price must be in the chain's native currency, with `price.contract_address` set to 0x0000000000000000000000000000000000000000.\n\nA stage with a price above zero needs a creator payout address, the wallet that receives mint proceeds: SeaDrop reverts every paid mint while the contract has none. If the contract has no payout address yet, send `creator_payout_address` with the stages; a save with a paid stage and no payout address anywhere returns 400. Free stages need none.\n\nOnce minting has started, a save that raises `max_supply` or the price of the stage being minted from can be refused with 400. A drop whose supply or price is raised onchain during its mint is disabled.\n\nThe stage list has four rules, and rules 2 and 4 interact in a way worth reading before the first attempt:\n\n1. Exactly one stage must be `public_sale`.\n2. That public stage must be first in the array.\n3. The presales, meaning every stage after the first, must be contiguous among themselves: each one starts exactly when the previous presale ended. The first presale start time is not constrained.\n4. The last presale must end exactly when the public stage starts.\n\nTogether, 2 and 4 mean array order is not chronological order: the public stage is listed first and runs last, with the presales running in array order before it. A drop with two allowlist stages therefore sends `[public, presale1, presale2]` while time runs presale1, then presale2, then public. Rule 3 does not tie presale1 back to the public stage, which is why the chain reads forward from presale1 rather than from the array head.\n\nEach stage's `max_total_mintable_by_wallet` is what that stage adds for a wallet, not a running total. Limits add up across the stages a wallet is listed on, the public stage adds its own limit on top, and mints a wallet leaves unused carry into later stages. So presales of 2 and 1 plus a public limit of 1 let a wallet on both lists mint 4.",
         "operationId": "save_drop_edits",
         "parameters": [
           {
@@ -2058,7 +2058,7 @@
       "post": {
         "tags": ["Drops Endpoints"],
         "summary": "Build publish transaction data for a drop",
-        "description": "Returns a ready-to-sign transaction that applies the drop's saved edits onchain: stages, supply, base URI, payout, and the OpenSea signer, fee recipient, and payers the drop needs. Every value is computed by OpenSea; do not build or change this calldata yourself, or signed presales stop validating.\n\nSend the transaction from `from`, the contract's onchain owner. Only the collection owner can call this endpoint.\n\nOnly ERC-721 SeaDrop V1 drops are published. An ERC-1155 self-mint drop has no publish step and returns 400: each of its items goes onchain through the transaction POST /api/v2/drops/{slug}/items returns.\n\nA 400 carries the reason the drop cannot be published, for example that it is disabled, its launch date is still pending, or it has no saved edits to apply. After a first publish, the drop is live once GET /api/v2/drops/{slug} returns it, which happens after the transaction is mined and indexed.\n\nTo reveal, run POST /api/v2/drops/{slug}/metadata/ipfs, wait for it to complete, then call this endpoint again to put the new base URI onchain.",
+        "description": "Returns a ready-to-sign transaction that applies the drop's saved edits onchain: stages, supply, base URI, payout, and the OpenSea signer, fee recipient, and payers the drop needs. Every value is computed by OpenSea; do not build or change this calldata yourself, or signed presales stop validating.\n\nSend the transaction from `from`, the contract's onchain owner. Only the collection owner can call this endpoint.\n\nOnly ERC-721 SeaDrop V1 drops are published. An ERC-1155 self-mint drop has no publish step and returns 400: each of its items goes onchain through the transaction POST /api/v2/drops/{slug}/items returns.\n\nA 400 carries the reason the drop cannot be published, for example that it is disabled, its launch date is still pending, it has no saved edits to apply, or a stage has a price while neither the saved edits nor the contract has a creator payout address (every paid mint would revert). After a first publish, the drop is live once GET /api/v2/drops/{slug} returns it, which happens after the transaction is mined and indexed.\n\nTo reveal, run POST /api/v2/drops/{slug}/metadata/ipfs, wait for it to complete, then call this endpoint again to put the new base URI onchain.",
         "operationId": "build_drop_publish_transaction",
         "parameters": [
           {
@@ -2185,7 +2185,7 @@
       "post": {
         "tags": ["Drops Endpoints"],
         "summary": "Build mint transaction data for a drop",
-        "description": "Returns ready-to-sign transaction data for minting tokens from a drop. The caller is responsible for signing and submitting the transaction. No wallet authentication is required, only an API key. The minter address in the request body determines who will receive the tokens. Stage selection is handled automatically by the backend: if multiple stages are active, the first eligible stage is used.\n\nSupports ERC-721 SeaDrop V1 drops only; an ERC-1155 drop returns 400.\n\nA 422 means the drop is mintable but this mint is not: the minter is not on the active presale's allowlist (the message names the stage and when the public stage opens), the quantity is over the wallet's limit or the remaining supply (the message says how many remain), or the minter cannot pay the price and gas.",
+        "description": "Returns ready-to-sign transaction data for minting tokens from a drop. The caller is responsible for signing and submitting the transaction. No wallet authentication is required, only an API key. The minter address in the request body determines who will receive the tokens. Stage selection is handled automatically by the backend: if multiple stages are active, the first eligible stage is used.\n\nSupports ERC-721 SeaDrop V1 drops only; an ERC-1155 drop returns 400.\n\nA 422 means the drop is mintable but this mint is not: the minter is not on the active presale's allowlist (the message names the stage and when the public stage opens), the quantity is over the wallet's limit or the remaining supply (the message says how many remain), the minter cannot pay the price and gas, or the active stage has a price and the drop has no creator payout address, so every paid mint would revert until the creator sets one.",
         "operationId": "build_drop_mint_transaction",
         "parameters": [
           {
@@ -2251,7 +2251,7 @@
             }
           },
           "422": {
-            "description": "Minting precondition failed: insufficient native balance, wallet not in allowlist, mint limit exceeded, or supply exhausted",
+            "description": "Minting precondition failed: insufficient native balance, wallet not in allowlist, mint limit exceeded, supply exhausted, or a paid stage on a drop with no creator payout address",
             "content": {
               "*/*": {
                 "schema": {
@@ -2707,7 +2707,7 @@
             }
           },
           "422": {
-            "description": "Minting precondition failed, including an ineligible wallet, exhausted supply, insufficient balance, or a payer that is not allowed for the active presale",
+            "description": "Minting precondition failed, including an ineligible wallet, exhausted supply, insufficient balance, a payer that is not allowed for the active presale, a paid stage on a drop with no creator payout address, or a mint Relay reports would fail on the drop's chain (DESTINATION_TX_FAILED). Retrying the same request does not help.",
             "content": {
               "*/*": {
                 "schema": {
@@ -13548,7 +13548,8 @@
         "properties": {
           "unit": {
             "type": "string",
-            "description": "Price unit as a decimal string"
+            "description": "Price per token in whole units of the chain's native currency, as a decimal string: \"0.05\" is 0.05 ETH on Ethereum or Base, and \"0\" is a free stage. This is not wei. The stages in GET /api/v2/drops/{slug} report `price` in wei, so divide that value by 10^18 before sending it back here.",
+            "example": "0.05"
           },
           "contract_address": {
             "type": "string",
@@ -13577,7 +13578,8 @@
           },
           "creator_payout_address": {
             "type": ["string", "null"],
-            "description": "Creator payout address"
+            "description": "The wallet that receives mint proceeds, written to the contract on the next publish. Required when any stage has a price above zero and the contract has no payout address yet: SeaDrop reverts every paid mint while none is set, so such a save returns 400. Free drops can omit it. Each save replaces the drafted value, so a save that omits it drops any address an earlier save drafted and keeps the one already onchain. Must not be the zero address.",
+            "example": "0x1234567890123456789012345678901234567890"
           },
           "launch_date_pending": {
             "type": "boolean",
@@ -18041,10 +18043,20 @@
             "format": "int32",
             "description": "Total number of holders with a non-zero balance"
           },
+          "top_holders_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Size of the measured top-holder cohort: 250, or the total holder count when fewer"
+          },
+          "top_holders_concentration": {
+            "type": "number",
+            "format": "float",
+            "description": "Percentage of eligible supply (all holdings after mint/LP/CEX/burn exclusions) held by the top 250 holders (0-100)"
+          },
           "top_one_percent_concentration": {
             "type": "number",
             "format": "float",
-            "description": "Percentage of total supply held by the top 1% of holders (0-100)"
+            "description": "Deprecated: percentage of eligible supply (after mint/LP/CEX/burn exclusions) held by the top 1% of holders (0-100), approximated from the fetched top-250 rows for tokens whose 1% cohort exceeds 250 holders; use top_holders_concentration"
           },
           "health_score": {
             "type": "integer",
@@ -18060,6 +18072,8 @@
         "required": [
           "health_label",
           "health_score",
+          "top_holders_concentration",
+          "top_holders_count",
           "top_one_percent_concentration",
           "total_holders"
         ]

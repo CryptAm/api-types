@@ -1,5 +1,12 @@
 # @opensea/api-types
 
+## 0.14.2
+
+### Patch Changes
+
+- 6ffe0c9: Sync OpenAPI spec. Documentation-only: the drop endpoints (`save_drop_edits`, `build_drop_publish_transaction`, `build_drop_mint_transaction`, and the 422 responses of the mint endpoints) now describe the creator payout address requirement for paid stages, `DropStagePrice.unit` documents that it is in whole units of the native currency (not wei) with an example, and `creator_payout_address` documents its save/publish semantics with an example. No paths, schemas, or field types changed.
+- e7882a8: Sync OpenAPI spec. `TokenHolderDistributionResponse`, returned under `GET /api/v2/chain/{chain}/token/{address}/holders`, gains two required fields: `top_holders_count`, the size of the measured top-holder cohort (250, or every holder when there are fewer), and `top_holders_concentration`, the percentage of eligible supply that cohort holds. Eligible supply excludes mint, LP, CEX and burn holdings. `top_one_percent_concentration` is now documented as deprecated in favor of `top_holders_concentration`, since it is approximated from the same 250 rows for tokens with more than 25,000 holders.
+
 ## 0.14.1
 
 ### Patch Changes
