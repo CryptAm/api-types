@@ -356,7 +356,7 @@ export interface paths {
         put?: never;
         /**
          * Cancel an order
-         * @description Offchain cancel a single order, offer or listing, by its order hash when protected by the SignedZone. Protocol and Chain are required to prevent hash collisions. Please note cancellation is only assured if a fulfillment signature was not vended prior to cancellation.
+         * @description Offchain cancel a single order, offer or listing, by its order hash when protected by the SignedZone. Protocol and Chain are required to prevent hash collisions. An offchain cancel stops OpenSea from issuing new fulfillment signatures for the order, but a fulfillment signature issued before the cancel stays valid until it expires (up to 5 minutes after it was issued), and a buyer holding one can still fill the order until then. The response field last_signature_issued_valid_until reports when the last issued signature expires. To stop fills without waiting for that signature to expire, cancel the order onchain; use the get order cancellation actions endpoint to build that transaction. The order stays fillable until the onchain cancel transaction is confirmed.
          */
         post: operations["cancel_order"];
         delete?: never;
@@ -783,7 +783,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List drop items
+         * @description List the items saved to a drop, including a draft drop that is not published yet. Use it to check what an upload saved. Only the collection owner or an authorized editor can list them.
+         */
+        get: operations["list_drop_items"];
         put?: never;
         /**
          * Build transaction data for creating a SelfMint drop item
@@ -811,7 +815,7 @@ export interface paths {
         put?: never;
         /**
          * Upload drop item media
-         * @description This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Pass each token as media_token to POST /api/v2/drops/{slug}/items or POST /api/v2/drops/{slug}/prereveal-item, as media_tokens to POST /api/v2/drops/{slug}/items/media/save, or as media_token to PUT /api/v2/drops/{slug}/items/{token_id}.
+         * @description This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Pass each token as media_token to POST /api/v2/drops/{slug}/items or POST /api/v2/drops/{slug}/prereveal-item, as media_tokens to POST /api/v2/drops/{slug}/items/media/save, or as media_token to PUT /api/v2/drops/{slug}/items/{token_id}. To save a drop's items in bulk, pass an upload_batch_id on the upload requests and save with POST /api/v2/drops/{slug}/items/media/save-batch, which takes filenames rather than tokens. Passing media_tokens to POST /api/v2/drops/{slug}/items/media/save is deprecated.
          */
         post: operations["upload_drop_item_media"];
         delete?: never;
@@ -831,11 +835,36 @@ export interface paths {
         put?: never;
         /**
          * Save drop item media
-         * @description Saves the drop's items from media tokens issued by POST /api/v2/drops/{slug}/items/media and uploaded to storage. Each save replaces the drop's items rather than adding to them. With a manifest from POST /api/v2/drops/{slug}/items/manifest, items take their token ids and metadata from it; without one they are numbered 1 to n in the order given.
+         * @deprecated
+         * @description Deprecated: use POST /api/v2/drops/{slug}/items/media/save-batch, which saves the same items by upload_batch_id and filename. This operation keeps working, but sends every media token back and checks each file separately, so it slows down with drop size.
+         *
+         *     Saves the drop's items from media tokens issued by POST /api/v2/drops/{slug}/items/media and uploaded to storage. Each save replaces the drop's items rather than adding to them. With a manifest from POST /api/v2/drops/{slug}/items/manifest, items take their token ids and metadata from it; without one they are numbered 1 to n in the order given.
          *
          *     Not available on ERC-1155 self-mint drops, which return 400: create each of their items with POST /api/v2/drops/{slug}/items.
          */
         post: operations["save_drop_item_media"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/drops/{slug}/items/media/save-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save drop item media from an upload batch
+         * @description Saves the drop's items from files uploaded with one upload_batch_id through POST /api/v2/drops/{slug}/items/media, naming them by filename instead of by media token. The request stays small for large drops: a 15,000-item save is about a tenth of the size of the same save by media token, and it is validated with one storage listing instead of one lookup per file. It behaves exactly like POST /api/v2/drops/{slug}/items/media/save otherwise: each save replaces the drop's items, a manifest from POST /api/v2/drops/{slug}/items/manifest supplies token ids and metadata, and without one items are numbered 1 to n in the order of filenames.
+         *
+         *     Returns 400 when a filename is listed twice or was not uploaded in the batch, naming the files concerned. If a file was uploaded more than once in the batch, the most recent upload is saved. Not available on ERC-1155 self-mint drops.
+         */
+        post: operations["save_drop_item_media_batch"];
         delete?: never;
         options?: never;
         head?: never;
@@ -853,7 +882,7 @@ export interface paths {
         put?: never;
         /**
          * Upload drop metadata manifest
-         * @description The file is a CSV describing every item in the drop, one row per uploaded media file. Required columns are tokenID, name, description, and file_name, where file_name matches the filename passed to POST /api/v2/drops/{slug}/items/media. Optional columns are external_url, animation_url, and one attributes[<trait type>] column per trait. Upload it in two steps. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Unlike other upload contexts, the returned token is not passed to any later call: the file is stored against the drop, and the next POST /api/v2/drops/{slug}/items/media/save reads it. Send one media token per row there, because the save keeps only the files the manifest names. Without a manifest, items get token ids 1 to n in upload order, named #1 to #n, with no description or traits. Manifests do not apply to ERC-1155 self-mint drops, which return 400; each of their items is created with POST /api/v2/drops/{slug}/items.
+         * @description The file is a CSV describing every item in the drop, one row per uploaded media file. Required columns are tokenID, name, description, and file_name, where file_name matches the filename passed to POST /api/v2/drops/{slug}/items/media. Optional columns are external_url, animation_url, and one attributes[<trait type>] column per trait. Upload it in two steps. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Unlike other upload contexts, the returned token is not passed to any later call: the file is stored against the drop, and the next POST /api/v2/drops/{slug}/items/media/save-batch reads it. Send one filename per row there, because the save keeps only the files the manifest names. Without a manifest, items get token ids 1 to n in upload order, named #1 to #n, with no description or traits. Manifests do not apply to ERC-1155 self-mint drops, which return 400; each of their items is created with POST /api/v2/drops/{slug}/items.
          */
         post: operations["upload_drop_collection_manifest"];
         delete?: never;
@@ -951,6 +980,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/collections/{slug}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh collection metadata
+         * @description Queue a re-read of the collection's contract-level metadata, such as the name, description and image from contractURI(). Items with missing metadata are refetched too; to refresh one item use POST /api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/refresh. The refresh runs in the background, so GET /api/v2/collections/{slug} shows the result after it finishes. Only the collection owner or an authorized editor can request it.
+         */
+        post: operations["refresh_collection_metadata"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/collections/{slug}/pricing_currency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set collection pricing currency
+         * @description Choose whether a collection's secondary sales are priced in the chain's USD stablecoin or in its native currency. On Robinhood Chain collections default to USDG; send use_stablecoin false to price in ETH. The owner or an authorized editor can change it. Repricing runs as a background job, so listings move to the new currency shortly after the call returns. Multi-chain collections and collections with trading disabled cannot be switched.
+         */
+        post: operations["set_collection_pricing_currency"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/collections/{slug}/media/{placement}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload collection page media
+         * @description Upload an image or an MP4 video for the collection page: the hero (8:3 on desktop, 16:9 on mobile), about, narrative, content block and team sections. Set the content_type query parameter to the exact MIME type of the file. Video must be video/mp4. Files can be up to 50 MB. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Pass the token in PATCH /api/v2/collections/{slug}/metadata as { image: { token } } for an image or { video: { token } } for a video. The media type must match the upload: a video token sent as image, or the reverse, does not resolve and that media item is left out of the update. The placement picks where the file is stored, but the token is accepted in any media field of the metadata update. The presigned upload expires about a minute after it is issued.
+         */
+        post: operations["upload_collection_page_media"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/collections/{slug}/images/{image_type}": {
         parameters: {
             query?: never;
@@ -962,9 +1051,33 @@ export interface paths {
         put?: never;
         /**
          * Upload collection image
-         * @description Set the content_type query parameter to the exact MIME type of the image bytes. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Pass the token as the matching image field in PATCH /api/v2/collections/{slug}.
+         * @description Set the content_type query parameter to the exact MIME type of the image bytes. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Pass the token as the matching image field in PATCH /api/v2/collections/{slug}. The same token is also accepted as { image: { token } } anywhere in PATCH /api/v2/collections/{slug}/metadata. The image is stored as uploaded, with no cropping or banner processing, whichever image_type was requested. For page media, and for any video, use POST /api/v2/collections/{slug}/media/{placement} instead.
          */
         post: operations["upload_collection_image"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/collections/{slug}/creator_fee_enforcement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get creator fee enforcement
+         * @description Whether creator fees are enforced onchain for a collection through a transfer validator (ERC721-C), and whether its contract supports turning that on.
+         */
+        get: operations["get_creator_fee_enforcement"];
+        put?: never;
+        /**
+         * Build creator fee enforcement transactions
+         * @description Build the transactions that turn creator fee enforcement on or off for a collection, for the owner to sign and send. Turning it on sets OpenSea's transfer validator on the contract (the Creator earnings tab in Studio); turning it off removes it. Nothing changes until the transactions are mined. Only the collection owner can call this, and the contract must be owned onchain by that wallet. When enforcement is already in the requested state, transactions is empty and there is nothing to send. Check the result with GET /api/v2/collections/{slug}/creator_fee_enforcement.
+         */
+        post: operations["build_creator_fee_enforcement_transactions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1270,7 +1383,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get collection page metadata
+         * @description Read back the hero, about and overview content saved by PATCH /api/v2/collections/{slug}/metadata, including for a drop that is not published yet. Only the collection owner or an authorized editor can read it. The response has the same shape as that request body, so a client can change one module and send the whole overview back. Saves show up here within a few seconds rather than immediately.
+         */
+        get: operations["get_collection_metadata"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2825,7 +2942,7 @@ export interface components {
          * @example ethereum
          * @enum {string}
          */
-        ChainIdentifier: "blast" | "base" | "ethereum" | "zora" | "arbitrum" | "sei" | "avalanche" | "polygon" | "optimism" | "ape_chain" | "flow" | "b3" | "soneium" | "ronin" | "bera_chain" | "solana" | "shape" | "unichain" | "gunzilla" | "abstract" | "animechain" | "hyperevm" | "somnia" | "monad" | "hyperliquid" | "megaeth" | "ink" | "robinhood" | "stablechain" | "arc";
+        ChainIdentifier: "blast" | "base" | "ethereum" | "zora" | "arbitrum" | "sei" | "avalanche" | "polygon" | "optimism" | "ape_chain" | "flow" | "soneium" | "ronin" | "bera_chain" | "solana" | "shape" | "unichain" | "gunzilla" | "abstract" | "animechain" | "hyperevm" | "somnia" | "monad" | "hyperliquid" | "megaeth" | "ink" | "robinhood" | "stablechain" | "arc";
         /** @description Ready-to-sign drop transaction */
         DropTransactionResponse: {
             /** @description Transaction target contract address */
@@ -3847,6 +3964,7 @@ export interface components {
             offererSignature?: string;
         };
         CancelResponse: {
+            /** @description ISO 8601 timestamp at which the last fulfillment signature OpenSea issued for this order expires. Until then, a buyer holding that signature can still fill the order despite the offchain cancel. The value is "0" when no fulfillment signature was issued, in which case the order can no longer be filled. */
             last_signature_issued_valid_until: string;
         };
         /** @description Request to get order cancellation actions */
@@ -4628,6 +4746,12 @@ export interface components {
              *     ]
              */
             filenames: string[];
+            /**
+             * Format: uuid
+             * @description Optional. Uploads these files as part of one upload batch, so the drop can be saved with POST /api/v2/drops/{slug}/items/media/save-batch by filename instead of sending every media token back. Generate one UUID per set of files and pass it on every request for that set. Use a new UUID for each new set, so each filename is uploaded once per batch.
+             * @example 5f0c2b1e-7a4d-4e8b-9c3f-2d6a1b0e9f47
+             */
+            upload_batch_id?: string;
         };
         /** @description Response body for saving drop item media */
         SaveDropItemMediaResponse: {
@@ -4638,6 +4762,23 @@ export interface components {
         SaveDropItemMediaRequest: {
             /** @description Media tokens to save */
             media_tokens: string[];
+        };
+        /** @description Request body for saving drop item media from an upload batch */
+        SaveDropItemMediaBatchRequest: {
+            /**
+             * Format: uuid
+             * @description The upload_batch_id the files were uploaded with through POST /api/v2/drops/{slug}/items/media.
+             * @example 5f0c2b1e-7a4d-4e8b-9c3f-2d6a1b0e9f47
+             */
+            upload_batch_id: string;
+            /**
+             * @description Filenames exactly as uploaded in the batch, one per item and each at most once, up to 15000. Without a manifest, items are numbered 1 to n in this order. Files in the batch that are not named here are not saved.
+             * @example [
+             *       "1.png",
+             *       "2.png"
+             *     ]
+             */
+            filenames: string[];
         };
         /** @description Ordered transactions required to complete a cross-chain mint */
         CrossChainDropMintResponse: {
@@ -4722,6 +4863,46 @@ export interface components {
              * @example 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
              */
             sender: string;
+        };
+        /** @description Result of a collection metadata refresh request */
+        CollectionRefreshResponse: {
+            /** @description Whether the refresh was queued */
+            success: boolean;
+        };
+        /** @description Result of a request to change a collection's pricing currency */
+        SetCollectionPricingCurrencyResponse: {
+            /** @description Whether the change was accepted */
+            success: boolean;
+            /** @description Id of the background job that reprices the collection. Null when the collection was already priced in the requested currency and nothing needed to change. */
+            workflow_id?: string | null;
+        };
+        /** @description Request body for choosing the currency a collection is priced in */
+        SetCollectionPricingCurrencyRequest: {
+            /** @description true prices the collection in the chain's USD stablecoin (USDG on Robinhood Chain). false prices it in the chain's native currency (ETH on Robinhood Chain). */
+            use_stablecoin: boolean;
+        };
+        /** @description A ready-to-sign transaction */
+        CollectionTransactionResponse: {
+            /** @description Transaction target contract address */
+            to: string;
+            /** @description Address the transaction must be sent from: the contract's onchain owner. Sent from any other address it reverts. */
+            from: string;
+            /** @description Encoded transaction data (hex) */
+            data: string;
+            /** @description Transaction value in wei */
+            value: string;
+            /** @description Chain identifier */
+            chain: string;
+        };
+        /** @description Ready-to-sign transactions. Send them in order from the address in each one's from field. */
+        CollectionTransactionsResponse: {
+            /** @description Transactions to send, in order. Empty when nothing needs to change onchain. */
+            transactions: components["schemas"]["CollectionTransactionResponse"][];
+        };
+        /** @description Request body for turning creator fee enforcement on or off */
+        SetCreatorFeeEnforcementRequest: {
+            /** @description true sets OpenSea's transfer validator on the contract so creator fees are enforced. false removes the validator. */
+            enabled: boolean;
         };
         /** @description Request body for batch collection retrieval by slugs */
         BatchCollectionsRequest: {
@@ -5039,7 +5220,7 @@ export interface components {
             /** @description Creator fee recipient address */
             address: string;
         };
-        /** @description Request body for modifying collection metadata */
+        /** @description Request body for modifying collection metadata. Only the fields you send change. X (Twitter) and Discord are not free-text links: they are verified connections made by signing in to the account in Creator Studio, so they cannot be set here. */
         ModifyCollectionRequest: {
             /** @description Collection name */
             name?: string | null;
@@ -5049,7 +5230,7 @@ export interface components {
             logo_image_token?: string | null;
             /** @description Banner image token */
             banner_image_token?: string | null;
-            /** @description Collection category */
+            /** @description Collection category. Creators can no longer set or change it: any value other than the current one is rejected with 400, and OpenSea support handles category changes. */
             category?: string | null;
             /** @description New collection slug */
             slug?: string | null;
@@ -5061,7 +5242,7 @@ export interface components {
             is_rarity_disabled?: boolean | null;
             /** @description Authorized editors */
             authorized_editors?: string[] | null;
-            /** @description Collection external URL */
+            /** @description Website URL shown on the collection page */
             external_url?: string | null;
             /** @description Collection Telegram URL */
             telegram_url?: string | null;
@@ -5096,64 +5277,67 @@ export interface components {
         };
         /** @description Collection about content */
         AboutMetadataRequest: {
-            /** @description Preview media */
+            /** @description Preview media, at most 10. A non-empty list replaces the saved preview media; an empty or missing list keeps it. */
             preview_media?: components["schemas"]["MediaInputRequest"][] | null;
-            /** @description About sections */
+            /** @description About sections, at most 10. A non-empty list replaces the saved sections: a saved section you leave out is removed. A section whose id matches a saved one keeps that section's media when you send none. An empty or missing list keeps the saved sections. */
             sections?: components["schemas"]["AboutSectionRequest"][] | null;
         };
         /** @description A section within collection about content */
         AboutSectionRequest: {
-            /** @description Section ID */
+            /** @description Section ID. Send the saved id to update that section in place. */
             id?: string | null;
-            /** @description Section title */
+            /** @description Section title, 1 to 100 characters */
             title: string;
-            /** @description Section description */
+            /** @description Section description, 1 to 1000 characters */
             description: string;
-            /** @description Section media */
+            /** @description Section media, at most 20 */
             media?: components["schemas"]["MediaInputRequest"][] | null;
         };
-        /** @description A content block overview module */
+        /** @description A content block overview module: a carousel of sections. The first section's module_type sets the layout for the whole block, so give every section the same type. */
         ContentBlockModuleRequest: {
             /**
              * Format: int32
-             * @description Module index
+             * @description Position on the page across all module types
              */
             index: number;
             /** @description Module ID */
             id?: string | null;
-            /** @description Module title */
+            /** @description Module title, up to 100 characters */
             title?: string | null;
-            /** @description Module description */
+            /** @description Module description, up to 1000 characters */
             description?: string | null;
-            /** @description Module sections */
+            /** @description Module sections, at most 20 */
             sections?: components["schemas"]["ContentBlockSectionRequest"][] | null;
         };
         /** @description A content block section */
         ContentBlockSectionRequest: {
-            /** @description Section ID */
+            /** @description Section ID (not saved for timeline sections) */
             id?: string | null;
-            /** @description Section title */
+            /** @description Section title, up to 100 characters */
             title?: string | null;
-            /** @description Section description */
+            /** @description Section description, up to 1000 characters. Rendered as Markdown on the page: links are clickable and raw HTML is dropped. */
             description?: string | null;
             /** @description Section external link */
             external_link?: components["schemas"]["LinkRequest"] | null;
             /** @description Section media */
             media?: components["schemas"]["MediaInputRequest"] | null;
-            /** @description Section module type */
-            module_type: string;
-            /** @description Section date */
+            /**
+             * @description Section type. default is a freeform card: title, description, media and an optional external_link. timeline is an entry in a timeline carousel: the same fields plus date, shown as the entry's heading. feature features another collection, named by collection_slug, in a featured collections carousel.
+             * @enum {string}
+             */
+            module_type: "default" | "feature" | "timeline";
+            /** @description Timeline sections only: the heading label, up to 100 characters. It is free text shown as written, such as Phase 1 or Q3 2026, not a parsed date. */
             date?: string | null;
-            /** @description Collection slug */
+            /** @description Feature sections only: slug of the collection to feature */
             collection_slug?: string | null;
-            /** @description Token ID */
+            /** @description Feature sections only: token ID of an item */
             token_id?: string | null;
         };
         /** @description A FAQ overview module */
         FaqBlockModuleRequest: {
             /**
              * Format: int32
-             * @description Module index
+             * @description Position on the page across all module types
              */
             index: number;
             /** @description Whether the module is hidden */
@@ -5162,28 +5346,28 @@ export interface components {
             title?: string | null;
             /** @description Module description */
             description?: string | null;
-            /** @description Module sections */
+            /** @description Questions, at most 20 */
             sections?: components["schemas"]["FaqSectionRequest"][] | null;
         };
-        /** @description A FAQ section */
+        /** @description A FAQ entry */
         FaqSectionRequest: {
             /** @description Section ID */
             id?: string | null;
-            /** @description Question */
+            /** @description Question, up to 200 characters */
             question: string;
-            /** @description Answer */
+            /** @description Answer, up to 2000 characters. Rendered as Markdown on the page: links are clickable and raw HTML is dropped. */
             answer: string;
         };
         /** @description Collection hero content */
         HeroMetadataRequest: {
-            /** @description Desktop hero media */
+            /** @description Desktop hero media, 8:3. Sending it replaces the saved desktop hero; an empty object {} clears it. Leave it out to keep the saved one. */
             desktop_hero_media?: components["schemas"]["MediaInputRequest"] | null;
-            /** @description Mobile hero media */
+            /** @description Mobile hero media, 16:9. Sending it replaces the saved mobile hero; an empty object {} clears it. Leave it out to keep the saved one. */
             mobile_hero_media?: components["schemas"]["MediaInputRequest"] | null;
         };
         /** @description An image media input */
         ImageMediaRequest: {
-            /** @description Image token */
+            /** @description Token of an uploaded image, the url of an image already saved on this page to keep it, or an https url on the OpenSea CDN (seadn.io). Any other value is not saved: the media item is left out of the update. */
             token: string;
         };
         /** @description A link input */
@@ -5193,7 +5377,7 @@ export interface components {
             /** @description Link label */
             label: string;
         };
-        /** @description A generic media input */
+        /** @description A media item. Set image or video, not both. */
         MediaInputRequest: {
             /** @description Image media */
             image?: components["schemas"]["ImageMediaRequest"] | null;
@@ -5206,14 +5390,14 @@ export interface components {
             id?: string | null;
             /**
              * Format: int32
-             * @description Module index
+             * @description Position on the page across all module types
              */
             index: number;
-            /** @description Module title */
+            /** @description Module title, up to 100 characters */
             title: string;
-            /** @description Module description */
+            /** @description Module description, up to 1000 characters. Rendered as Markdown on the page: links are clickable and raw HTML is dropped. */
             description: string;
-            /** @description Module media */
+            /** @description Module media, at most 20 */
             media?: components["schemas"]["MediaInputRequest"][] | null;
             /** @description Horizontal text position */
             horizontal_text_position?: string | null;
@@ -5225,9 +5409,9 @@ export interface components {
             mobile_background_media?: components["schemas"]["MediaInputRequest"] | null;
             /** @description Module variant */
             variant?: string | null;
-            /** @description Background image */
+            /** @description Accepted for compatibility but not saved. Use desktop_background_media and mobile_background_media. */
             background_image?: components["schemas"]["ImageMediaRequest"] | null;
-            /** @description Background media */
+            /** @description Accepted for compatibility but not saved. Use desktop_background_media and mobile_background_media. */
             background_media?: components["schemas"]["MediaInputRequest"] | null;
         };
         /** @description Collection overview content */
@@ -5235,22 +5419,22 @@ export interface components {
             /** @description Overview modules */
             modules: components["schemas"]["OverviewModuleRequest"];
         };
-        /** @description Overview modules */
+        /** @description Overview modules by type. index on each module sets its position on the page across all four types, lowest first, so give every module a distinct index. */
         OverviewModuleRequest: {
-            /** @description Narrative modules */
+            /** @description Narrative modules, at most 50 */
             narrative?: components["schemas"]["NarrativeModuleRequest"][] | null;
-            /** @description Content block modules */
+            /** @description Content block modules, at most 10 */
             content_block?: components["schemas"]["ContentBlockModuleRequest"][] | null;
-            /** @description Team modules */
+            /** @description Team modules, at most 5 */
             team?: components["schemas"]["TeamBlockModuleRequest"][] | null;
-            /** @description FAQ modules */
+            /** @description FAQ modules, at most 5 */
             faq?: components["schemas"]["FaqBlockModuleRequest"][] | null;
         };
         /** @description A team overview module */
         TeamBlockModuleRequest: {
             /**
              * Format: int32
-             * @description Module index
+             * @description Position on the page across all module types
              */
             index: number;
             /** @description Whether the module is hidden */
@@ -5259,10 +5443,10 @@ export interface components {
             title?: string | null;
             /** @description Module description */
             description?: string | null;
-            /** @description Module sections */
+            /** @description Team members, at most 20 */
             sections?: components["schemas"]["TeamSectionRequest"][] | null;
         };
-        /** @description A team section */
+        /** @description A team member */
         TeamSectionRequest: {
             /** @description Section ID */
             id?: string | null;
@@ -5270,7 +5454,7 @@ export interface components {
             name: string;
             /** @description Section title */
             title: string;
-            /** @description Section bio */
+            /** @description Bio, up to 500 characters. Rendered as Markdown on the page: links are clickable and raw HTML is dropped. */
             bio: string;
             /** @description Website URL */
             website_url?: string | null;
@@ -5278,25 +5462,25 @@ export interface components {
             twitter_url?: string | null;
             /** @description Instagram URL */
             instagram_url?: string | null;
-            /** @description Section media */
+            /** @description Team member media, at most 20 */
             media?: components["schemas"]["MediaInputRequest"][] | null;
         };
-        /** @description Request body for updating collection metadata */
+        /** @description Request body for updating a collection's page: hero, about and overview. Top-level fields you leave out keep what is saved. Each field you send replaces what is saved for it, as its description says; overview in particular is replaced as a whole. Media fields take a token from POST /api/v2/collections/{slug}/media/{placement} or POST /api/v2/collections/{slug}/images/{image_type}. To keep media that is already saved, send its url from GET /api/v2/collections/{slug}/metadata as the token. Read the result back with GET /api/v2/collections/{slug}/metadata. */
         UpdateCollectionMetadataRequest: {
-            /** @description Collection about content */
+            /** @description About content. Leave it out to keep the saved about content. */
             about?: components["schemas"]["AboutMetadataRequest"] | null;
-            /** @description Collection hero media */
+            /** @description Hero media. Leave it out to keep the saved hero. */
             hero?: components["schemas"]["HeroMetadataRequest"] | null;
-            /** @description Collection overview content */
+            /** @description Overview modules. Sending overview replaces every saved module: a module type you leave out is removed, so sending only faq clears the narrative, content block and team modules. Leave overview out to keep the saved modules. */
             overview?: components["schemas"]["OverviewMetadataRequest"] | null;
             /** @description Collection logo image token */
             logo_image_token?: string | null;
         };
         /** @description A video media input */
         VideoMediaRequest: {
-            /** @description Video token */
+            /** @description Token of an uploaded video/mp4, the url of a video already saved on this page to keep it, or an https url on the OpenSea CDN (seadn.io). Any other value is not saved: the media item is left out of the update. */
             token: string;
-            /** @description Enable static video */
+            /** @description Accepted for compatibility but not saved */
             enable_static_video?: boolean | null;
         };
         /** @description Floor price for one trait value in one payment currency */
@@ -6060,6 +6244,13 @@ export interface components {
             /** @description Why the upload failed, when status is failed */
             failure_reason?: string | null;
         };
+        /** @description A page of the items saved to a drop */
+        DropItemsPaginatedResponse: {
+            /** @description Saved items */
+            items: components["schemas"]["DropItemResponse"][];
+            /** @description Cursor for the next page, or null on the last page */
+            next?: string | null;
+        };
         /** @description Drop eligibility results for the authenticated wallet */
         DropEligibilityResponse: {
             /** @description Per-stage eligibility results */
@@ -6268,6 +6459,165 @@ export interface components {
             /** @description Blockchain chain */
             chain: string;
         };
+        /** @description Collection about content */
+        AboutMetadataResponse: {
+            /** @description Preview media */
+            preview_media: components["schemas"]["PageMediaResponse"][];
+            /** @description About sections */
+            sections: components["schemas"]["AboutSectionResponse"][];
+        };
+        /** @description A section of the about content */
+        AboutSectionResponse: {
+            id?: string | null;
+            title?: string | null;
+            description?: string | null;
+            media: components["schemas"]["PageMediaResponse"][];
+        };
+        /** @description The collection page content as saved by PATCH /api/v2/collections/{slug}/metadata. The shape mirrors that request body, so it can be edited and sent back. To keep a media item when you send PATCH /api/v2/collections/{slug}/metadata, pass its url back as the token. A mux_video item is the exception: it has no url, so it cannot be sent back. To keep one, leave out the request field that holds it; each field's description says what leaving it out keeps. */
+        CollectionPageMetadataResponse: {
+            /** @description Hero media, or null when none is saved */
+            hero?: components["schemas"]["HeroMetadataResponse"] | null;
+            /** @description About content, or null when none is saved */
+            about?: components["schemas"]["AboutMetadataResponse"] | null;
+            /** @description Overview modules, or null when none are saved */
+            overview?: components["schemas"]["OverviewMetadataResponse"] | null;
+        };
+        /** @description A content block overview module */
+        ContentBlockModuleResponse: {
+            id?: string | null;
+            /**
+             * Format: int32
+             * @description Position of the module on the page, counting from 0
+             */
+            index: number;
+            title?: string | null;
+            description?: string | null;
+            sections: components["schemas"]["ContentBlockSectionResponse"][];
+        };
+        /** @description A section of a content block */
+        ContentBlockSectionResponse: {
+            id?: string | null;
+            /** @description default, feature or timeline */
+            module_type: string;
+            title?: string | null;
+            description?: string | null;
+            /** @description Label of a timeline entry, as saved */
+            date?: string | null;
+            external_link?: components["schemas"]["LinkResponse"] | null;
+            media?: components["schemas"]["PageMediaResponse"] | null;
+            /** @description Featured item's collection (feature only) */
+            collection_slug?: string | null;
+            /** @description Featured item's token id (feature only) */
+            token_id?: string | null;
+        };
+        /** @description A FAQ overview module */
+        FaqModuleResponse: {
+            /**
+             * Format: int32
+             * @description Position of the module on the page, counting from 0
+             */
+            index: number;
+            hidden?: boolean | null;
+            title?: string | null;
+            description?: string | null;
+            sections: components["schemas"]["FaqSectionResponse"][];
+        };
+        /** @description A FAQ entry */
+        FaqSectionResponse: {
+            id?: string | null;
+            question?: string | null;
+            answer?: string | null;
+        };
+        /** @description Collection hero media */
+        HeroMetadataResponse: {
+            /** @description Desktop hero media (8:3) */
+            desktop_hero_media?: components["schemas"]["PageMediaResponse"] | null;
+            /** @description Mobile hero media (16:9) */
+            mobile_hero_media?: components["schemas"]["PageMediaResponse"] | null;
+        };
+        /** @description A link */
+        LinkResponse: {
+            href?: string | null;
+            label?: string | null;
+        };
+        /** @description A narrative overview module */
+        NarrativeModuleResponse: {
+            id?: string | null;
+            /**
+             * Format: int32
+             * @description Position of the module on the page, counting from 0
+             */
+            index: number;
+            title?: string | null;
+            description?: string | null;
+            media: components["schemas"]["PageMediaResponse"][];
+            /** @description left, center or right */
+            horizontal_text_position?: string | null;
+            /** @description top, center or bottom */
+            vertical_text_position?: string | null;
+            desktop_background_media?: components["schemas"]["PageMediaResponse"] | null;
+            mobile_background_media?: components["schemas"]["PageMediaResponse"] | null;
+            /** @description text, background, text_and_background or text_and_media */
+            variant?: string | null;
+        };
+        /** @description Collection overview content */
+        OverviewMetadataResponse: {
+            /** @description Overview modules grouped by type */
+            modules: components["schemas"]["OverviewModulesResponse"];
+        };
+        /** @description Overview modules grouped by type */
+        OverviewModulesResponse: {
+            narrative: components["schemas"]["NarrativeModuleResponse"][];
+            content_block: components["schemas"]["ContentBlockModuleResponse"][];
+            team: components["schemas"]["TeamModuleResponse"][];
+            faq: components["schemas"]["FaqModuleResponse"][];
+        };
+        /** @description A saved image */
+        PageImageResponse: {
+            /** @description Stored image URL */
+            url: string;
+        };
+        /** @description A saved media item. Exactly one of image, video or mux_video is set. To keep a media item when you send PATCH /api/v2/collections/{slug}/metadata, pass its url back as the token. */
+        PageMediaResponse: {
+            image?: components["schemas"]["PageImageResponse"] | null;
+            video?: components["schemas"]["PageVideoResponse"] | null;
+            /** @description Video hosted on Mux. It has no url, so it cannot be sent back as a token. */
+            mux_video?: components["schemas"]["PageMuxVideoResponse"] | null;
+        };
+        /** @description A saved Mux video */
+        PageMuxVideoResponse: {
+            playback_id: string;
+            thumbnail_url?: string | null;
+        };
+        /** @description A saved video */
+        PageVideoResponse: {
+            /** @description Stored video URL */
+            url: string;
+            thumbnail_url?: string | null;
+        };
+        /** @description A team member */
+        TeamMemberResponse: {
+            id?: string | null;
+            name?: string | null;
+            title?: string | null;
+            bio?: string | null;
+            website_url?: string | null;
+            twitter_url?: string | null;
+            instagram_url?: string | null;
+            media: components["schemas"]["PageMediaResponse"][];
+        };
+        /** @description A team overview module */
+        TeamModuleResponse: {
+            /**
+             * Format: int32
+             * @description Position of the module on the page, counting from 0
+             */
+            index: number;
+            hidden?: boolean | null;
+            title?: string | null;
+            description?: string | null;
+            sections: components["schemas"]["TeamMemberResponse"][];
+        };
         /** @description A collection holder */
         CollectionHolderResponse: {
             /** @description Wallet address of the holder */
@@ -6310,6 +6660,13 @@ export interface components {
             symbol?: string | null;
             /** @description Blockchain chain */
             chain?: string | null;
+        };
+        /** @description Creator fee enforcement state of a collection */
+        CreatorFeeEnforcementStatusResponse: {
+            /** @description Whether creator fees are enforced onchain today */
+            enabled: boolean;
+            /** @description Whether the collection's contract supports turning enforcement on through POST /api/v2/collections/{slug}/creator_fee_enforcement */
+            eligible: boolean;
         };
         NftListResponse: {
             nfts: components["schemas"]["Nft"][];
@@ -8749,6 +9106,45 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    list_drop_items: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Number of items to return (1-100, default: 50)
+                 * @example 50
+                 */
+                limit?: number;
+                /** @description Cursor for the next page, from the previous response's next */
+                next?: string;
+            };
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example cool-cats
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of saved items */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DropItemsPaginatedResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     save_self_mint_drop_item: {
         parameters: {
             query?: never;
@@ -8876,6 +9272,49 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SaveDropItemMediaRequest"];
+            };
+        };
+        responses: {
+            /** @description Drop item media saved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaveDropItemMediaResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaveDropItemMediaResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    save_drop_item_media_batch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example cool-cats
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveDropItemMediaBatchRequest"];
             };
         };
         responses: {
@@ -9127,6 +9566,114 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    refresh_collection_metadata: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example boredapeyachtclub
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Refresh queued */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionRefreshResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    set_collection_pricing_currency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example boredapeyachtclub
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCollectionPricingCurrencyRequest"];
+            };
+        };
+        responses: {
+            /** @description Change accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SetCollectionPricingCurrencyResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    upload_collection_page_media: {
+        parameters: {
+            query: {
+                /**
+                 * @description Exact MIME type of the file: any image type (image/png, image/jpeg, image/gif, image/webp and so on) or video/mp4.
+                 * @example video/mp4
+                 */
+                content_type: string;
+            };
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example boredapeyachtclub
+                 */
+                slug: string;
+                /**
+                 * @description Where the media goes on the page: hero_desktop, hero_mobile, about_preview, about_section, overview (narrative and content block media), overview_background (narrative backgrounds) or team.
+                 * @example hero_desktop
+                 */
+                placement: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Upload context generated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UploadContext"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     upload_collection_image: {
         parameters: {
             query: {
@@ -9173,6 +9720,70 @@ export interface operations {
                     "*/*": components["schemas"]["UploadContext"];
                 };
             };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    get_creator_fee_enforcement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example boredapeyachtclub
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Creator fee enforcement state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CreatorFeeEnforcementStatusResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    build_creator_fee_enforcement_transactions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example boredapeyachtclub
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCreatorFeeEnforcementRequest"];
+            };
+        };
+        responses: {
+            /** @description Transactions to sign */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionTransactionsResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
@@ -9771,6 +10382,37 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    get_collection_metadata: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Collection slug
+                 * @example boredapeyachtclub
+                 */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saved page metadata */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CollectionPageMetadataResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     update_collection_metadata: {
         parameters: {
             query?: never;
@@ -10047,7 +10689,7 @@ export interface operations {
                  * @description Sort field (default: score)
                  * @example score
                  */
-                sort_by?: "market_cap" | "one_hour_volume" | "one_day_volume" | "one_hour_price_change" | "one_day_price_change" | "seven_day_price_change" | "fourteen_day_price_change" | "thirty_day_price_change" | "two_hundred_day_price_change" | "one_year_price_change" | "price" | "genesis_date" | "score";
+                sort_by?: "market_cap" | "fdv" | "one_hour_volume" | "one_day_volume" | "one_hour_price_change" | "one_day_price_change" | "seven_day_price_change" | "fourteen_day_price_change" | "thirty_day_price_change" | "two_hundred_day_price_change" | "one_year_price_change" | "price" | "genesis_date" | "score";
                 /**
                  * @description Sort direction (default: desc)
                  * @example desc
@@ -10092,7 +10734,7 @@ export interface operations {
                  * @description Sort field (default: one_day_volume)
                  * @example one_day_volume
                  */
-                sort_by?: "market_cap" | "one_hour_volume" | "one_day_volume" | "one_hour_price_change" | "one_day_price_change" | "seven_day_price_change" | "fourteen_day_price_change" | "thirty_day_price_change" | "two_hundred_day_price_change" | "one_year_price_change" | "price" | "genesis_date" | "score";
+                sort_by?: "market_cap" | "fdv" | "one_hour_volume" | "one_day_volume" | "one_hour_price_change" | "one_day_price_change" | "seven_day_price_change" | "fourteen_day_price_change" | "thirty_day_price_change" | "two_hundred_day_price_change" | "one_year_price_change" | "price" | "genesis_date" | "score";
                 /**
                  * @description Sort direction (default: desc)
                  * @example desc

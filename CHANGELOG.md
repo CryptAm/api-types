@@ -1,5 +1,15 @@
 # @opensea/api-types
 
+## 0.15.0
+
+### Minor Changes
+
+- bab8feb: Sync OpenAPI spec with the drop page endpoints. Adds `POST /api/v2/collections/{slug}/media/{placement}` (page media upload, image or video), `POST /api/v2/collections/{slug}/pricing_currency` (secondary sales currency, USDG or the native currency), `GET`/`POST /api/v2/collections/{slug}/creator_fee_enforcement` (Limit Break creator fee enforcement, returns the transactions to sign), and `POST /api/v2/collections/{slug}/refresh`. `GET /api/v2/collections/{slug}/metadata` now returns the saved page (`CollectionPageMetadataResponse`: hero, about, overview modules) with a preview URL, and `GET /api/v2/drops/{slug}/items` lists a draft drop's items (`DropItemsPaginatedResponse`). The `b3` chain is no longer in the spec's chain enum.
+
+### Patch Changes
+
+- 07d0bdc: Sync OpenAPI spec. Adds `save_drop_item_media_batch` (`POST /api/v2/drops/{slug}/items/media/save-batch`) and its `SaveDropItemMediaBatchRequest` schema, which saves a drop's items from one upload batch by filename, up to 15,000. `UploadDropItemMediaRequest` gains an optional `upload_batch_id` (UUID) that puts each upload request's files in that batch. `save_drop_item_media` (`POST /api/v2/drops/{slug}/items/media/save`, by media token) is now marked deprecated; it still works.
+
 ## 0.14.2
 
 ### Patch Changes

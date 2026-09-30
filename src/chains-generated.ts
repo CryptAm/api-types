@@ -26,7 +26,6 @@ export const CHAIN_IDENTIFIERS = [
   "optimism",
   "ape_chain",
   "flow",
-  "b3",
   "soneium",
   "ronin",
   "bera_chain",
