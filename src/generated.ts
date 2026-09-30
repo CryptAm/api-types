@@ -1011,7 +1011,7 @@ export interface paths {
         put?: never;
         /**
          * Set collection pricing currency
-         * @description Choose whether a collection's secondary sales are priced in the chain's USD stablecoin or in its native currency. On Robinhood Chain collections default to USDG; send use_stablecoin false to price in ETH. The owner or an authorized editor can change it. Repricing runs as a background job, so listings move to the new currency shortly after the call returns. Multi-chain collections and collections with trading disabled cannot be switched.
+         * @description Choose whether a collection's secondary sales are priced in the chain's USD stablecoin or in its native currency. On Robinhood Chain collections default to USDG; send use_stablecoin false to price in ETH. The owner or an authorized editor can change it. Repricing runs as a background job, so listings move to the new currency shortly after the call returns. Multi-chain collections and collections with trading disabled cannot be switched. While a switch is still running, another request returns 409; retry once it finishes.
          */
         post: operations["set_collection_pricing_currency"];
         delete?: never;
@@ -1051,7 +1051,7 @@ export interface paths {
         put?: never;
         /**
          * Upload collection image
-         * @description Set the content_type query parameter to the exact MIME type of the image bytes. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Pass the token as the matching image field in PATCH /api/v2/collections/{slug}. The same token is also accepted as { image: { token } } anywhere in PATCH /api/v2/collections/{slug}/metadata. The image is stored as uploaded, with no cropping or banner processing, whichever image_type was requested. For page media, and for any video, use POST /api/v2/collections/{slug}/media/{placement} instead.
+         * @description Set the content_type query parameter to the exact MIME type of the image bytes. This response starts a three-step upload flow. First, request this context from OpenSea. Second, call the returned method at the returned URL. For POST, add every fields entry unchanged as a multipart text field, then add a file part containing the bytes. The file part must be last. Let the HTTP library generate the multipart boundary; do not set the overall multipart Content-Type header yourself. POST storage uploads normally return 204. For PUT, upload the raw bytes, use only headers explicitly required by the endpoint, and expect 200. Treat any 2xx storage response as success. The URL and fields are short-lived sensitive credentials. Do not log, persist, alter, or put them in tickets. Third, after storage succeeds, pass the returned token to the documented OpenSea API endpoint. Do not use the token before the storage upload succeeds. Pass the token as the matching image field in PATCH /api/v2/collections/{slug}: logo_image_token for profile_picture, banner_image_token for banner_image. The same token is also accepted as { image: { token } } anywhere in PATCH /api/v2/collections/{slug}/metadata. The image is stored as uploaded, with no cropping or banner processing, whichever image_type was requested. For page media, and for any video, use POST /api/v2/collections/{slug}/media/{placement} instead.
          */
         post: operations["upload_collection_image"];
         delete?: never;
@@ -5277,9 +5277,9 @@ export interface components {
         };
         /** @description Collection about content */
         AboutMetadataRequest: {
-            /** @description Preview media, at most 10. A non-empty list replaces the saved preview media; an empty or missing list keeps it. */
+            /** @description Preview media, at most 10. A non-empty list replaces the saved preview media; an empty list removes it; leave preview_media out to keep it. */
             preview_media?: components["schemas"]["MediaInputRequest"][] | null;
-            /** @description About sections, at most 10. A non-empty list replaces the saved sections: a saved section you leave out is removed. A section whose id matches a saved one keeps that section's media when you send none. An empty or missing list keeps the saved sections. */
+            /** @description About sections, at most 10. A non-empty list replaces the saved sections: a saved section you leave out is removed. A section whose id matches a saved one keeps that section's media when you leave media out. An empty list removes every saved section; leave sections out to keep them. */
             sections?: components["schemas"]["AboutSectionRequest"][] | null;
         };
         /** @description A section within collection about content */
@@ -5290,7 +5290,7 @@ export interface components {
             title: string;
             /** @description Section description, 1 to 1000 characters */
             description: string;
-            /** @description Section media, at most 20 */
+            /** @description Section media, at most 20. A non-empty list replaces the section's media; an empty list removes it; leave media out to keep a matching saved section's media. */
             media?: components["schemas"]["MediaInputRequest"][] | null;
         };
         /** @description A content block overview module: a carousel of sections. The first section's module_type sets the layout for the whole block, so give every section the same type. */
@@ -9629,6 +9629,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -9691,10 +9692,10 @@ export interface operations {
                  */
                 slug: string;
                 /**
-                 * @description Image type
+                 * @description Which collection image to upload: profile_picture (the collection logo, set with logo_image_token) or banner_image (set with banner_image_token).
                  * @example profile_picture
                  */
-                image_type: string;
+                image_type: "profile_picture" | "banner_image";
             };
             cookie?: never;
         };

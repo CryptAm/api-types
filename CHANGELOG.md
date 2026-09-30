@@ -1,5 +1,11 @@
 # @opensea/api-types
 
+## 0.15.1
+
+### Patch Changes
+
+- 3ca4e84: Sync OpenAPI spec. `UpdateCollectionMetadataRequest` now documents that an empty `about.preview_media` list removes the saved preview media and an empty `media` list on an about section removes that section's media, while leaving either out keeps it. `set_collection_pricing_currency` documents a 409 when a pricing currency switch is already running. The `image_type` path parameter of `upload_collection_image` is now typed `"profile_picture" | "banner_image"`, the two values the API accepts.
+
 ## 0.15.0
 
 ### Minor Changes
